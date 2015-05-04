@@ -1,0 +1,13 @@
+{application, lucet,
+ [
+  {description, "Wiring Compiler"},
+  {vsn, "0.1"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib,
+                  dobby_clib,
+                  lager
+                 ]},
+  {env, []}
+ ]}.

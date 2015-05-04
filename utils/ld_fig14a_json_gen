@@ -1,0 +1,111 @@
+#!/usr/bin/env escript
+
+-define(TYPE(T), {<<"type">>, atom_to_binary(T, utf8)}).
+
+main([Filename]) ->
+    publish_fig_14_A(Filename).
+
+%% @doc Generates a json file for a figure 14 A in Lucet desgin doc.
+%%
+%% The doc is here:
+%% https://docs.google.com/document/d/1Gtoi8IX1EN3oWDRPTFa_VltOdJAwRbl_ChAZWk8oKIk/edit#heading=h.t814rryc9eo
+%% The json file can be imported into Dobby.
+publish_fig_14_A(Filename) ->
+    setup(),
+    Ph1PatchP = endpoints_with_ph1(),
+    [VifLmVp11, VifLmVp12] = vh1(),
+    publish(VifLmVp11, Ph1PatchP, lk_part_of_md()),
+    publish(VifLmVp12, Ph1PatchP, lk_part_of_md()),
+    export_to_json(Filename).
+
+endpoints_with_ph1() ->
+    publish(id_lm_ph(LmPh = <<"PH1">>)),
+    %% Note the "PatchP" suffix; identifiers have to be unique
+    publish(id_lm_patchp(LmPatchP = <<"PH1/PatchP">>, #{})),
+    [begin
+         LmVp = list_to_binary(io_lib:format("PH1/VP~p",[N])),
+         LmPp = list_to_binary(io_lib:format("PH1/PP~p",[N])),
+         Ep = list_to_binary(io_lib:format("Pi~p",[N])),
+         publish(id_lm_vp(LmVp), id_lm_pp(LmPp), lk_bound_to_md()),
+         publish(LmPp, id_endpoint(Ep), lk_endpoint_md()),
+         publish(LmPp, LmPh, lk_part_of_md()),
+         publish(LmPp, LmPatchP, lk_part_of_md())
+     end || N <- [1,2]],
+    LmPatchP.
+
+vh1() ->
+    publish(id_lm_vh(LmVh = <<"PH1/VH1">>)),
+    %% Note the "PatchP" suffix; identifiers have to be unique
+    publish(id_lm_patchp(LmPatchP = <<"PH1/VH1/PatchP">>, #{})),
+    publish(id_lm_of_switch(LmOfSwitch = <<"PH1/VH1/OFS1">>)),
+    [begin
+         VifLmVp = list_to_binary(io_lib:format("PH1/VP1.~p",[N])),
+         LmVp = list_to_binary(io_lib:format("PH1/VH1/VP~p",[N])),
+         LmOfPort = list_to_binary(io_lib:format("PH1/VH1/OFS1/OFP~p",[N])),
+         %% part of
+         publish(id_lm_vp(LmVp), LmPatchP, lk_part_of_md()),
+         publish(LmVp, LmVh, lk_part_of_md()),
+         publish(id_lm_of_port(LmOfPort), LmPatchP, lk_part_of_md()),
+         publish(LmOfPort, LmOfSwitch, lk_part_of_md()),
+         %% bound to
+         publish(id_lm_vp(VifLmVp), LmVp, lk_bound_to_md()),
+         publish(LmVp, LmOfPort, lk_bound_to_md()),
+         VifLmVp
+     end || N <- [1,2]].
+
+%% identifiers
+
+id_endpoint(Name) ->
+    {Name, [?TYPE(endpoint)]}.
+
+id_lm_ph(Name) ->
+    {Name, [?TYPE(lm_ph)]}.
+
+id_lm_pp(Name) ->
+    {Name, [?TYPE(lm_pp)]}.
+
+id_lm_patchp(Name, Wires) ->
+    {Name, [?TYPE(lm_pathp), {<<"wires">>, Wires}]}.
+
+id_lm_vp(Name) ->
+    {Name, [?TYPE(lm_vp)]}.
+
+id_lm_vh(Name) ->
+    {Name, [?TYPE(lm_vh)]}.
+
+id_lm_of_port(Name) ->
+    %% The type should be 'lm_of_port' but for now weave and dobby_oflib
+    %% operate just on 'of_port'
+    {Name, [?TYPE(of_port)]}.
+
+id_lm_of_switch(Name) ->
+    %% The type should be 'lm_of_switch' but for now weave and dobby_oflib
+    %% operate just on 'of_switch'
+    {Name, [?TYPE(of_switch)]}.
+
+%% Links
+
+lk_bound_to_md() ->
+    [?TYPE(bound_to)].
+
+lk_part_of_md() ->
+    [?TYPE(part_of)].
+
+lk_endpoint_md() ->
+    [].
+
+%% Misc
+
+setup() ->
+    code:add_pathsa(filelib:wildcard("deps/*/ebin")),
+    {ok, _} = application:ensure_all_started(dobby),
+    dby_mnesia:clear().
+
+publish(Src, Dst, LinkMetadata) ->
+    dby:publish(<<"lucet">>, Src, Dst, LinkMetadata, [persistent]).
+
+publish(Endpoint) ->
+    dby:publish(<<"lucet">>, Endpoint, [persistent]).
+
+export_to_json(Filename) ->
+    ok = dby_bulk:export(json, Filename).
