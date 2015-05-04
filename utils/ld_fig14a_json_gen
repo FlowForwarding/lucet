@@ -65,7 +65,7 @@ id_lm_pp(Name) ->
     {Name, [?TYPE(lm_pp)]}.
 
 id_lm_patchp(Name, Wires) ->
-    {Name, [?TYPE(lm_pathp), {<<"wires">>, Wires}]}.
+    {Name, [?TYPE(lm_patchp), {<<"wires">>, Wires}]}.
 
 id_lm_vp(Name) ->
     {Name, [?TYPE(lm_vp)]}.
