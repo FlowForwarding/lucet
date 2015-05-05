@@ -5,7 +5,9 @@
 -define(JSON_FILE, "../lucet_design_fig14_A.json").
 -define(PI1_ID, <<"Pi1">>).
 -define(OFP1_ID, <<"PH1/VH1/OFS1/OFP1">>).
+-define(PH1_PP1_ID, <<"PH1/PP1">>).
 -define(PH1_VP1_ID, <<"PH1/VP1">>).
+-define(PH1_VP11_ID, <<"PH1/VP1.1">>).
 -define(PH1_PATCHP_ID, <<"PH1/PatchP">>).
 -define(PH1_PATCHP_TO_OFP1_PATH,
         [?PH1_PATCHP_ID, <<"PH1/VP1.1">>, <<"PH1/VH1/VP1">>, ?OFP1_ID]).
@@ -16,8 +18,12 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("dobby_clib/include/dobby.hrl").
 
+%% API
+
 connect(Src, Dst) ->
     ok.
+
+%% Internal functions
 
 %% @doc Returns a path that starts in an endpoint, goes to an identifier
 %% of `lm_pp' type and then following only 'bound_to' links reaches the
@@ -38,10 +44,10 @@ get_bound_path_from_endpoint(Destination) ->
        (_Id, ?TYPE(<<"lm_pp">>), [{_, ?TYPE(<<"endpoint">>), _ } |  _], Acc) ->
             {continue, Acc};
        %% finally we're following 'bound_to path' if such exists
-       (Id, Md, [{_, _, ?TYPE(<<"bound_to">>)}] = Path, Acc)
+       (Id, Md, [{_, _, ?TYPE(<<"bound_to">>)} | _] = Path, _)
           when Id =:= Destination ->
             {stop, lists:reverse(Path, [{Id, Md, #{}}])};
-       (Id, Md, [{_, _, ?TYPE(<<"bound_to">>)}] = Path, Acc) ->
+       (_Id, _Md, [{_, _, ?TYPE(<<"bound_to">>)} | _], Acc) ->
             {continue, Acc};
        %% store the most recent patch panel in case there's no 'bound_to' path
        (Id, ?TYPE(<<"lm_patchp">>) = Md, Path, _Acc) ->
@@ -66,15 +72,27 @@ get_bound_path_from_patchp(Destination) ->
        (_Id, ?TYPE(<<"lm_vp">>), [{_, _, ?TYPE(<<"part_of">>)}], Acc) ->
             {continue, Acc};
        %% finally we expect to find the 'bound to path' to the destination
-       (Id, Md, [{_, _, ?TYPE(<<"bound_to">>)} | _] = Path, Acc)
+       (Id, Md, [{_, _, ?TYPE(<<"bound_to">>)} | _] = Path, _Acc)
           when Id =:= Destination ->
             {stop, lists:reverse(Path, [{Destination, Md, #{}}])};
-       (_Id, _Md, [{_, _, ?TYPE(<<"bound_to">>)} | _] = Path, Acc) ->
+       (_Id, _Md, [{_, _, ?TYPE(<<"bound_to">>)} | _], Acc) ->
             {continue, Acc};
        %% any other path is not interesting for us
        (_, _, _, Acc) ->
             {skip, Acc}
     end.
+
+bound_ports_on_patch_panel(PatchpId, PortA, PortB) ->
+    ok = dby:publish(<<"lucet">>, PortA, PortB, [{<<"type">>, <<"bound_to">>}],
+                     [persistent]),
+    MdFun = fun(MdProplist) ->
+                    Wires0 = proplists:get_value(<<"wires">>, MdProplist),
+                    Wires1 = maps:update(PortA, PortB, Wires0),
+                    Wires2 = maps:update(PortB, PortA, Wires1),
+                    [{<<"wires">>, Wires2} | proplists:delete(<<"wires">>,
+                                                              MdProplist)]
+            end,
+    ok = dby:publish(<<"lucet">>, {PatchpId, MdFun}, [persistent]).
 
 %% Tests
 
@@ -83,7 +101,9 @@ ld_fig14a_test_() ->
      [{"Not connected path",
        fun it_returns_last_patchp_of_unbound_path/0},
       {"Shortest path from patchp",
-       fun it_returns_shortest_path_from_patchp_to_dst/0}]}.
+       fun it_returns_shortest_path_from_patchp_to_dst/0},
+      {"Connecting on patchp",
+       fun it_bounds_ports_on_patchp/0}]}.
 
 setup_dobby() ->
     application:stop(dobby),
@@ -106,6 +126,29 @@ it_returns_shortest_path_from_patchp_to_dst() ->
                       ?PH1_PATCHP_ID,
                       [breadth, {max_depth, 100}]),
     ExpectedPath = ?PH1_PATCHP_TO_OFP1_PATH,
+    ?assertEqual(ExpectedPath, lists:map(fun({ActualId, _, _}) ->
+                                                 ActualId
+                                         end, Path)).
+it_bounds_ports_on_patchp() ->
+    %% GIVEN
+    PatchpId = ?PH1_PATCHP_ID,
+    PortA = ?PH1_PP1_ID,
+    PortB = ?PH1_VP11_ID,
+
+    %% WHEN
+    bound_ports_on_patch_panel(PatchpId, PortA, PortB),
+
+    %% THEN
+    Path = dby:search(get_bound_path_from_endpoint(?OFP1_ID),
+                      [],
+                      ?PI1_ID,
+                      [breadth, {max_depth, 100}]),
+    ExpectedPath = lists:filter(fun(?PH1_PATCHP_ID) ->
+                                        false;
+                                   (_) ->
+                                        true
+                                end, ?PI1_TO_PH1_PATCHP_PATH
+                                ++ ?PH1_PATCHP_TO_OFP1_PATH),
     ?assertEqual(ExpectedPath, lists:map(fun({ActualId, _, _}) ->
                                                  ActualId
                                          end, Path)).

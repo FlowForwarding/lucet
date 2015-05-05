@@ -13,24 +13,29 @@ main([Filename]) ->
 publish_fig_14_A(Filename) ->
     setup(),
     Ph1PatchP = endpoints_with_ph1(),
-    [VifLmVp11, VifLmVp12] = vh1(),
+    VifPorts = [VifLmVp11, VifLmVp12] = vh1(),
     publish(VifLmVp11, Ph1PatchP, lk_part_of_md()),
     publish(VifLmVp12, Ph1PatchP, lk_part_of_md()),
+    Wires = maps:from_list([{P, <<"null">>} || P <- VifPorts]),
+    publish(Ph1PatchP, update_patchp_wires_md(Wires)),
     export_to_json(Filename).
 
 endpoints_with_ph1() ->
     publish(id_lm_ph(LmPh = <<"PH1">>)),
     %% Note the "PatchP" suffix; identifiers have to be unique
     publish(id_lm_patchp(LmPatchP = <<"PH1/PatchP">>, #{})),
-    [begin
-         LmVp = list_to_binary(io_lib:format("PH1/VP~p",[N])),
-         LmPp = list_to_binary(io_lib:format("PH1/PP~p",[N])),
-         Ep = list_to_binary(io_lib:format("Pi~p",[N])),
-         publish(id_lm_vp(LmVp), id_lm_pp(LmPp), lk_part_of_md()),
-         publish(LmPp, id_endpoint(Ep), lk_endpoint_md()),
-         publish(LmPp, LmPh, lk_part_of_md()),
-         publish(LmPp, LmPatchP, lk_part_of_md())
-     end || N <- [1,2]],
+    PhysicalPorts = [begin
+                         LmVp = list_to_binary(io_lib:format("PH1/VP~p",[N])),
+                         LmPp = list_to_binary(io_lib:format("PH1/PP~p",[N])),
+                         Ep = list_to_binary(io_lib:format("Pi~p",[N])),
+                         publish(id_lm_vp(LmVp), id_lm_pp(LmPp), lk_part_of_md()),
+                         publish(LmPp, id_endpoint(Ep), lk_endpoint_md()),
+                         publish(LmPp, LmPh, lk_part_of_md()),
+                         publish(LmPp, LmPatchP, lk_part_of_md()),
+                         LmPp
+                     end || N <- [1,2]],
+    Wires = maps:from_list([{P, <<"null">>} || P <- PhysicalPorts]),
+    publish(LmPatchP, [{<<"wires">>, Wires}]),
     LmPatchP.
 
 vh1() ->
@@ -109,5 +114,15 @@ publish(Src, Dst, LinkMetadata) ->
 publish(Endpoint) ->
     dby:publish(<<"lucet">>, Endpoint, [persistent]).
 
+publish(Endpoint, Metadata) ->
+    dby:publish(<<"lucet">>, {Endpoint, Metadata}, [persistent]).
+
 export_to_json(Filename) ->
     ok = dby_bulk:export(json, Filename).
+
+update_patchp_wires_md(NewWires) ->
+    fun(MdProplist) ->
+            Wires = proplists:get_value(<<"wires">>, MdProplist),
+            [{<<"wires">>, maps:merge(NewWires, Wires)}
+             | proplists:delete(<<"wires">>, MdProplist)]
+    end.
