@@ -26,7 +26,7 @@ endpoints_with_ph1() ->
          LmVp = list_to_binary(io_lib:format("PH1/VP~p",[N])),
          LmPp = list_to_binary(io_lib:format("PH1/PP~p",[N])),
          Ep = list_to_binary(io_lib:format("Pi~p",[N])),
-         publish(id_lm_vp(LmVp), id_lm_pp(LmPp), lk_bound_to_md()),
+         publish(id_lm_vp(LmVp), id_lm_pp(LmPp), lk_part_of_md()),
          publish(LmPp, id_endpoint(Ep), lk_endpoint_md()),
          publish(LmPp, LmPh, lk_part_of_md()),
          publish(LmPp, LmPatchP, lk_part_of_md())
@@ -97,6 +97,8 @@ lk_endpoint_md() ->
 %% Misc
 
 setup() ->
+    [os:cmd(io_lib:format("rm -rf ~p", [Dir]))
+     || Dir <- filelib:wildcard("utils/Mnesia*"), filelib:is_dir(Dir)],
     code:add_pathsa(filelib:wildcard("deps/*/ebin")),
     {ok, _} = application:ensure_all_started(dobby),
     dby_mnesia:clear().
