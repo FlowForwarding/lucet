@@ -1,6 +1,6 @@
 -module(lucet).
 
--export([connect/2]).
+-export([wire/2]).
 
 -define(JSON_FILE, "../lucet_design_fig14_A.json").
 -define(PI1_ID, <<"Pi1">>).
@@ -20,10 +20,55 @@
 
 %% API
 
-connect(Src, Dst) ->
-    ok.
+wire(Endpoint, OFPort) ->
+    connect_endpoint_with_of_port(Endpoint, OFPort),
+    generate_domain_config_and_run_vm().
 
 %% Internal functions
+
+generate_domain_config_and_run_vm() ->
+    %% TODO
+    ok.
+
+%% @doc Connects an `Endpoint' with the `OFPort'.
+%%
+%% It assumes that the `Endpoint' is connected to a physical port (PP).
+%% Then it connects identifiers in the Dobby so that there's a path between
+%% the physical port and the `OFPort' consisting only of 'bound_to' links.
+%% It also marks the connection on the appropriate PatchP identifier.
+-spec connect_endpoint_with_of_port(dby_identifier(), dby_identifier()) ->
+                                           ok | {error, Reason :: term()}.
+
+connect_endpoint_with_of_port(Endpoint, OFPort) ->
+    case search_bound_path_from_endpoint_to_of_port(Endpoint, OFPort) of
+        {not_found, ToPatchp0} ->
+            ToPatchp = filter_out_md(ToPatchp0),
+            Patchp = lists:last(ToPatchp),
+            FromPatchp0 = search_path_from_patchp_to_of_port(Patchp, OFPort),
+            FromPatchp = filter_out_md(FromPatchp0),
+            assert_from_patchp_path_exists(FromPatchp),
+            {PortA, PortB} =
+                ports_to_be_connected(ToPatchp ++ tl(FromPatchp), Patchp),
+            bound_ports_on_patch_panel(Patchp, PortA, PortB);
+        _ExistingPath ->
+            ok
+    end.
+
+assert_from_patchp_path_exists(not_found) ->
+    throw(not_found);
+assert_from_patchp_path_exists(_) ->
+    ok.
+
+filter_out_md(Path) ->
+    lists:map(fun({Id, _Md, _LinkMd}) -> Id end, Path).
+
+ports_to_be_connected([PortA, PatchP, PortB | _], PatchP) ->
+    {PortA, PortB};
+ports_to_be_connected([_ | T], PatchP) ->
+    ports_to_be_connected(T, PatchP);
+ports_to_be_connected([], _) ->
+    throw(not_found).
+
 
 %% @doc Returns a path that starts in an endpoint, goes to an identifier
 %% of `lm_pp' type and then following only 'bound_to' links reaches the
@@ -31,12 +76,12 @@ connect(Src, Dst) ->
 %% last `lm_patchp' identifier will be returned. It may occur that
 %% there's no `bound_to' link from the `lm_pp' identifier. Then a path
 %% consisting of an `endpoint', `lm_pp' and `lm_patchp' will be returned.
--spec get_bound_path_from_endpoint(dby_identifier()) -> PathToDestination | PathToPatchp
+-spec get_bound_path_from_endpoint_fun(dby_identifier()) -> PathToDestination | PathToPatchp
                                               when
       PathToDestination :: [dby_identifier()],
       PathToPatchp :: {not_found, [dby_identifier()]}.
 
-get_bound_path_from_endpoint(Destination) ->
+get_bound_path_from_endpoint_fun(Destination) ->
     %% first identifier: an endpoint
     fun(_Id, ?TYPE(<<"endpoint">>), [], Acc) ->
             {continue, Acc};
@@ -61,10 +106,10 @@ get_bound_path_from_endpoint(Destination) ->
 %% @doc Returns a path that starts in a `lm_patchp', goes to an
 %% identifier of `lm_vp' type and then reaches `Destination' identifier
 %% through the links with the `bound_to' type.
--spec get_bound_path_from_patchp(dby_identifier()) ->
+-spec get_bound_path_from_patchp_fun(dby_identifier()) ->
                                         [dby_identifier()] | not_found.
 
-get_bound_path_from_patchp(Destination) ->
+get_bound_path_from_patchp_fun(Destination) ->
     %% we expect to start in patchp identifier
     fun(_Id, ?TYPE(<<"lm_patchp">>), [], Acc) ->
             {continue, Acc};
@@ -82,6 +127,12 @@ get_bound_path_from_patchp(Destination) ->
             {skip, Acc}
     end.
 
+
+%% @doc Bounds `PortA' with `PortB' that exists on `PatchPId'.
+%%
+%% It creates a bound_to link from `PortA' to `PortB' and updates
+%% wires metadata on the `PathchpId' indicating that the `PortA' and `PortB'
+%% are connected.
 bound_ports_on_patch_panel(PatchpId, PortA, PortB) ->
     ok = dby:publish(<<"lucet">>, PortA, PortB, [{<<"type">>, <<"bound_to">>}],
                      [persistent]),
@@ -94,6 +145,18 @@ bound_ports_on_patch_panel(PatchpId, PortA, PortB) ->
             end,
     ok = dby:publish(<<"lucet">>, {PatchpId, MdFun}, [persistent]).
 
+search_bound_path_from_endpoint_to_of_port(Endpoint, OFPort) ->
+    dby:search(get_bound_path_from_endpoint_fun(OFPort),
+               [],
+               Endpoint,
+               [breadth, {max_depth, 100}]).
+
+search_path_from_patchp_to_of_port(PatchP, OFPort) ->
+    dby:search(get_bound_path_from_patchp_fun(OFPort),
+               not_found,
+               PatchP,
+               [breadth, {max_depth, 100}]).
+
 %% Tests
 
 ld_fig14a_test_() ->
@@ -103,15 +166,20 @@ ld_fig14a_test_() ->
       {"Shortest path from patchp",
        fun it_returns_shortest_path_from_patchp_to_dst/0},
       {"Connecting on patchp",
-       fun it_bounds_ports_on_patchp/0}]}.
+       fun it_bounds_ports_on_patchp/0},
+      {"Connecting an Endpoint with OF Port",
+       fun it_connects_endpoint_with_of_port/0},
+      {"Connecting an Endpoint with OF Port (already exists)",
+       fun it_does_nothing_when_endpoint_already_connected_to_endpoint/0}]}.
 
 setup_dobby() ->
     application:stop(dobby),
     {ok, _} = application:ensure_all_started(dobby),
+    ok = dby_mnesia:clear(),
     ok = dby_bulk:import(json, ?JSON_FILE).
 
 it_returns_last_patchp_of_unbound_path() ->
-    {not_found, Path} = dby:search(get_bound_path_from_endpoint(?OFP1_ID),
+    {not_found, Path} = dby:search(get_bound_path_from_endpoint_fun(?OFP1_ID),
                                    [],
                                    ?PI1_ID,
                                    [breadth, {max_depth, 100}]),
@@ -121,7 +189,7 @@ it_returns_last_patchp_of_unbound_path() ->
                                          end, Path)).
 
 it_returns_shortest_path_from_patchp_to_dst() ->
-    Path = dby:search(get_bound_path_from_patchp(?OFP1_ID),
+    Path = dby:search(get_bound_path_from_patchp_fun(?OFP1_ID),
                       not_found,
                       ?PH1_PATCHP_ID,
                       [breadth, {max_depth, 100}]),
@@ -139,7 +207,8 @@ it_bounds_ports_on_patchp() ->
     bound_ports_on_patch_panel(PatchpId, PortA, PortB),
 
     %% THEN
-    Path = dby:search(get_bound_path_from_endpoint(?OFP1_ID),
+    %% Maybe we should only check that there's a bound_to link PortaA-PortB
+    Path = dby:search(get_bound_path_from_endpoint_fun(?OFP1_ID),
                       [],
                       ?PI1_ID,
                       [breadth, {max_depth, 100}]),
@@ -152,3 +221,48 @@ it_bounds_ports_on_patchp() ->
     ?assertEqual(ExpectedPath, lists:map(fun({ActualId, _, _}) ->
                                                  ActualId
                                          end, Path)).
+
+it_connects_endpoint_with_of_port() ->
+    %% GIVEN
+    Endpoint = ?PI1_ID,
+    OFPort = ?OFP1_ID,
+
+    %% WHEN
+    ok = connect_endpoint_with_of_port(Endpoint, OFPort),
+
+    %% THEN
+    assert_endpoint_connected_to_of_port(Endpoint, OFPort).
+
+it_does_nothing_when_endpoint_already_connected_to_endpoint() ->
+    %% GIVEN
+    Endpoint = ?PI1_ID,
+    OFPort = ?OFP1_ID,
+    ok = connect_endpoint_with_of_port(Endpoint, OFPort),
+    Path = search_bound_path_from_endpoint_to_of_port(Endpoint, OFPort),
+
+    %% WHEN
+    ok = connect_endpoint_with_of_port(Endpoint, OFPort),
+
+    %% THEN
+    ?assertEqual(Path,
+                 search_bound_path_from_endpoint_to_of_port(Endpoint, OFPort)).
+
+%% Tests helper functions
+
+assert_endpoint_connected_to_of_port(Endpoint, OFPort) ->
+    Path = dby:search(get_bound_path_from_endpoint_fun(OFPort),
+                  [],
+                      Endpoint,
+                  [breadth, {max_depth, 100}]),
+    ExpectedPath = pi1_to_ofp1_path(),
+    ?assertEqual(ExpectedPath, lists:map(fun({ActualId, _, _}) ->
+                                                 ActualId
+                                         end, Path)).
+
+pi1_to_ofp1_path() ->
+    lists:filter(fun(?PH1_PATCHP_ID) ->
+                         false;
+                    (_) ->
+                         true
+                 end, ?PI1_TO_PH1_PATCHP_PATH ++ ?PH1_PATCHP_TO_OFP1_PATH).
+
