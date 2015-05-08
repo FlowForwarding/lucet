@@ -1,6 +1,7 @@
 -module(lucet).
 
--export([wire/2]).
+-export([wire/2,
+	 generate_domain_config/2]).
 
 -define(JSON_FILE, "../lucet_design_fig14_A.json").
 -define(PI1_ID, <<"Pi1">>).
@@ -24,7 +25,60 @@ wire(Endpoint, OFPort) ->
     connect_endpoint_with_of_port(Endpoint, OFPort),
     generate_domain_config_and_run_vm().
 
+generate_domain_config(PhysicalHost, MgmtIfMac) ->
+    %% TODO: use domain config template file
+    PatchPanel = PhysicalHost ++ "/PatchP",
+    case dby:search(
+	   fun(_, #{<<"wires">> := #{value := Wires}}, _, _) ->
+		   {stop, {found, Wires}}
+	   end,
+	   not_found,
+	   list_to_binary(PatchPanel),
+	   [{max_depth, 1}]) of
+	{found, Wires} ->
+	    FirstVif = {MgmtIfMac, "xenbr0"},
+	    MgmtIfMacNo = mac_string_to_number(MgmtIfMac),
+	    OtherVifs =
+		maps:fold(
+		  fun(_Port1, <<"null">>, Acc) ->
+			  Acc;
+		     (Port1, Port2, Acc) ->
+			  case re:run(Port1, "^" ++ PhysicalHost ++ "/PP([0-9]+)$", [{capture, all_but_first, list}]) of
+			      {match, [IfNo]} ->
+				  MacNo = MgmtIfMacNo + list_to_integer(IfNo),
+				  [{mac_number_to_string(MacNo), "xenbr" ++ IfNo}] ++ Acc;
+			      nomatch ->
+				  %% Not starting from a physical port
+				  Acc
+			  end
+		  end, [], Wires),
+	    VifList = [FirstVif] ++ OtherVifs,
+	    VifString = "vif = [" ++
+		string:join(["'mac=" ++ Mac ++ ",bridge=" ++ If ++ "'" || {Mac, If} <- VifList],
+			    ",\n       ") ++
+		"]\n",
+	    io:format("~s~n", [VifString]),
+	    ok;
+	not_found ->
+	    io:format(standard_error, "Patch panel ~s not found in dobby!~n", [PatchPanel]),
+	    {error, {not_found, PatchPanel}}
+    end.
+
 %% Internal functions
+
+mac_string_to_number(MacS) ->
+    HexBytes = string:tokens(MacS, ":"),
+    lists:foldl(fun(HexByte, Acc) ->
+			list_to_integer(HexByte, 16) bor (Acc bsl 8)
+		end, 0, HexBytes).
+
+mac_number_to_string(Mac) ->
+    <<One:8, Two:8, Three:8, Four:8, Five:8, Six:8>> = <<Mac:48>>,
+    string:join(
+      lists:map(fun(Byte) ->
+			lists:flatten(io_lib:format("~2.16.0b", [Byte]))
+		end, [One, Two, Three, Four, Five, Six]),
+      ":").
 
 generate_domain_config_and_run_vm() ->
     %% TODO
