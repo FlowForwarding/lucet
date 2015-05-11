@@ -52,7 +52,7 @@ generate_domain_config(PhysicalHost, MgmtIfMac) ->
 				  Acc
 			  end
 		  end, [], Wires),
-	    VifList = [FirstVif] ++ OtherVifs,
+	    VifList = [FirstVif] ++ lists:sort(OtherVifs),
 	    VifString = "vif = [" ++
 		string:join(["'mac=" ++ Mac ++ ",bridge=" ++ If ++ "'" || {Mac, If} <- VifList],
 			    ",\n       ") ++
