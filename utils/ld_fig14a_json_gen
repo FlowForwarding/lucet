@@ -3,24 +3,30 @@
 -define(TYPE(T), {<<"type">>, atom_to_binary(T, utf8)}).
 
 main([Filename]) ->
-    publish_fig_14_A(Filename).
+    publish_fig_14_A(Filename, 2);
+main([Filename, NPortsS]) ->
+    publish_fig_14_A(Filename, list_to_integer(NPortsS)).
 
 %% @doc Generates a json file for a figure 14 A in Lucet desgin doc.
 %%
 %% The doc is here:
 %% https://docs.google.com/document/d/1Gtoi8IX1EN3oWDRPTFa_VltOdJAwRbl_ChAZWk8oKIk/edit#heading=h.t814rryc9eo
 %% The json file can be imported into Dobby.
-publish_fig_14_A(Filename) ->
+%%
+%% If NPorts is greater than 2, generate a corresponding graph with more ports.
+publish_fig_14_A(Filename, NPorts) ->
     setup(),
-    Ph1PatchP = endpoints_with_ph1(),
-    VifPorts = [VifLmVp11, VifLmVp12] = vh1(),
-    publish(VifLmVp11, Ph1PatchP, lk_part_of_md()),
-    publish(VifLmVp12, Ph1PatchP, lk_part_of_md()),
+    Ph1PatchP = endpoints_with_ph1(NPorts),
+    VifPorts = vh1(NPorts),
+    [
+     publish(VifLmVp, Ph1PatchP, lk_part_of_md())
+     || VifLmVp <- VifPorts
+    ],
     Wires = maps:from_list([{P, <<"null">>} || P <- VifPorts]),
     publish(Ph1PatchP, update_patchp_wires_md(Wires)),
     export_to_json(Filename).
 
-endpoints_with_ph1() ->
+endpoints_with_ph1(NPorts) ->
     publish(id_lm_ph(LmPh = <<"PH1">>)),
     %% Note the "PatchP" suffix; identifiers have to be unique
     publish(id_lm_patchp(LmPatchP = <<"PH1/PatchP">>, #{})),
@@ -33,12 +39,12 @@ endpoints_with_ph1() ->
                          publish(LmPp, LmPh, lk_part_of_md()),
                          publish(LmPp, LmPatchP, lk_part_of_md()),
                          LmPp
-                     end || N <- [1,2]],
+                     end || N <- lists:seq(1, NPorts)],
     Wires = maps:from_list([{P, <<"null">>} || P <- PhysicalPorts]),
     publish(LmPatchP, [{<<"wires">>, Wires}]),
     LmPatchP.
 
-vh1() ->
+vh1(NPorts) ->
     publish(id_lm_vh(LmVh = <<"PH1/VH1">>)),
     %% Note the "PatchP" suffix; identifiers have to be unique
     publish(id_lm_patchp(LmPatchP = <<"PH1/VH1/PatchP">>, #{})),
@@ -56,7 +62,7 @@ vh1() ->
          publish(id_lm_vp(VifLmVp), LmVp, lk_bound_to_md()),
          publish(LmVp, LmOfPort, lk_bound_to_md()),
          VifLmVp
-     end || N <- [1,2]].
+     end || N <- lists:seq(1, NPorts)].
 
 %% identifiers
 
