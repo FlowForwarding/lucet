@@ -1,0 +1,195 @@
+#!/usr/bin/env escript
+
+-mode(compile).
+
+-define(PH_NUM, 2).
+-define(PP_NUM, 5).
+-define(OFP_NUM, 4).
+-define(VM_NUM, 1).
+
+-define(NULL, <<"null">>).
+
+main([Filename]) ->
+    setup(),
+    publish_appfest_topo(),
+    common_gen:export_to_json(Filename).
+
+publish_appfest_topo() ->
+    PhPorts0 = [begin
+                  PhId = publish_ph_id(N),
+                  publish_ph(PhId)
+                end || N <- lists:seq(1, ?PH_NUM)],
+    PhPorts1 = lists:flatten(PhPorts0),
+    set_unwired_patchp(PatchpId = publish_patchp_id(<<>>), PhPorts1),
+    [publish_part_of_link(PatchpId, Id) || Id <- PhPorts1].
+
+%% daisychain_physical_hosts([First | _] = PPMaps) ->
+%%     daisychain_physical_hosts(First, PPMaps, []).
+
+%% daisychain_physical_hosts(First, [Current, Next | Rest], Connections) ->
+%%     A = maps:get(<<"PP2">>, Current),
+%%     B = maps:get(<<"PP3">>, Next),
+%%     daisychain_physical_hosts(First, [Next | Rest], [{A, B} | Connections]);
+%% daisychain_physical_hosts(First, [Last], Connections0) ->
+%%     %% Wire the first and the last.
+%%     %% Publish, but maybe there a patchp too?
+%%     Connections1 = [{maps:get(<<"PP2">>, Last),
+%%                      maps:get(<<"PP3">>, First)} | Connections0],
+%%     [publish_bound_to_link(A, B) || {A, B} <- Connections1].
+
+%% PH: Internal functions
+
+publish_ph(PhId) ->
+    PhPorts = publish_ph_ports(PhId),
+    LincxVifs = publish_lincx_vh(PhId),
+    VmsVifs = publish_vms(PhId),
+    set_unwired_patchp(PatchpId = publish_patchp_id(PhId),
+                       Ports = PhPorts ++ LincxVifs ++ VmsVifs),
+    [publish_part_of_link(PatchpId, Id) || Id <- Ports],
+    PhPorts.
+
+publish_ph_ports(PhId) ->
+    [begin
+         PpId = publish_pp_id(PhId, N),
+         VpId = publish_vp_id(PhId, N),
+         [publish_part_of_link(PhId, Id) || Id <- [PhId, VpId]],
+         PpId
+     end || N <- lists:seq(1, ?PP_NUM)].
+
+%% OFS: Internal functions
+
+publish_lincx_vh(PhId) ->
+    VhId = publish_vh_id(PhId, _VhNo = 1),
+    PatchpId = publish_patchp_id(VhId),
+    {Ofps, Vps, Vifs} = publish_ofs(PhId, VhId, PatchpId),
+    set_wired_patchp(PatchpId, lists:zip(Ofps, Vps)),
+    Vifs.
+
+publish_ofs(PhId, VhId, PatchpId) ->
+    OfsId = publish_ofs_id(VhId, _OfsNo = 1),
+    BoundedPorts =
+        [begin
+             OfpId = publish_ofp_id(OfsId, N),
+             VpId = publish_vp_id(VhId, N),
+             VifId = publish_vif_id(PhId, _PrefixN = 1, N),
+             [publish_part_of_link(OfpId, Id) || Id <- [OfsId, PatchpId]],
+             [publish_part_of_link(VpId, Id) || Id <- [VhId, PatchpId]],
+             [publish_bound_to_link(VpId, Id) || Id <- [OfpId, VifId]],
+             {OfpId, VpId, VifId}
+         end || N <- lists:seq(1, ?OFP_NUM)],
+    lists:unzip3(BoundedPorts).
+
+%% VM: Internal functions
+
+publish_vms(PhId) ->
+    [begin
+         %% VH numbers for VMs start from 2
+         VhNo = N + 1,
+         VmId = publish_vm_id(PhId, VhNo),
+         VpId = publish_vm_vp_with_ep(VmId, publish_patchp_id(VmId)),
+         VifId = publish_vif_id(PhId, VhNo, _VifSuffix = 1),
+         publish_bound_to_link(VifId, VpId),
+         VifId
+     end || N <- lists:seq(1, ?VM_NUM)].
+
+publish_vm_vp_with_ep(VmId, PatchpId) ->
+    publish_part_of_link(VpId = publish_vp_id(VmId, _VPNo = 0), PatchpId),
+    publish_part_of_link(EpId = publish_ep_id(VmId, _EpNo = 1), PatchpId),
+    publish_bound_to_link(VpId, EpId),
+    set_wired_patchp(PatchpId, [{EpId, VpId}]),
+    VpId.
+
+%% set_wired_patchp(PatchpId, Ports) ->
+%%     Wires = [maps:put(Id, ?NULL, #{}) || Id <- [EpId, VpId]],
+%%     update_patchp_wires_md(PatchpId, Wires).
+
+%% Internal functions: helpers
+
+setup() ->
+    {ok, common_gen} = compile:file("utils/common_gen"),
+    common_gen:setup().
+
+publish_patchp_id(Prefix) ->
+    PatchpId = id(Prefix, "Patchp"),
+    publish_id(common_gen:id_lm_patchp(PatchpId, #{})).
+
+publish_part_of_link(A, B) ->
+    common_gen:publish(A, B, common_gen:lk_part_of_md()).
+
+publish_bound_to_link(A, B) ->
+    common_gen:publish(A, B, common_gen:lk_bound_to_md()).
+
+publish_ph_id(N) ->
+    PhId = list_to_binary(io_lib:format("PH~p", [N])),
+    publish_id(common_gen:id_lm_ph(PhId)).
+
+publish_pp_id(Prefix, N) ->
+    PpId = id(Prefix, "PP~p", [N]),
+    publish_id(common_gen:id_lm_pp(PpId)).
+
+publish_vp_id(Prefix, N) ->
+    VpId = id(Prefix, "VP~p", [N]),
+    publish_id(common_gen:id_lm_vp(VpId)).
+
+publish_vh_id(Prefix, N) ->
+    VhId  = id(Prefix, "VH~p", [N]),
+    publish_id(common_gen:id_lm_vh(VhId)).
+
+publish_ofs_id(Prefix, N) ->
+    OfsId = id(Prefix, "OFS~p", [N]),
+    publish_id(common_gen:id_lm_of_switch(OfsId)).
+
+publish_ofp_id(Prefix, N) ->
+    OfpId = id(Prefix, "OFP~p", [N]),
+    publish_id(common_gen:id_lm_of_port(OfpId)).
+
+publish_vif_id(Prefix, PrefixN, N) ->
+    VifId = id(Prefix, "VP~p.~p", [PrefixN, N]),
+    publish_id(common_gen:id_lm_vp(VifId)).
+
+publish_vm_id(Prefix, N) ->
+    VmId = id(Prefix, "VH~p", [N]),
+    publish_id(common_gen:id_lm_vh(VmId)).
+
+publish_ep_id(Prefix, N) ->
+    EpId = id(Prefix, "EP~p", [N]),
+    publish_id(common_gen:id_endpoint(EpId)).
+
+publish_id({Name, _Md} = Id) ->
+    common_gen:publish(Id),
+    Name.
+
+set_unwired_patchp(PatchPId, Ports) ->
+    Wires = lists:foldl(fun(PortId, AccMap) ->
+                                maps:put(PortId, ?NULL, AccMap)
+                        end, #{}, Ports),
+    update_patchp_wires_md(PatchPId, Wires).
+
+set_wired_patchp(PatchpId, PortsPairs) ->
+    Wires = lists:foldl(fun({Ofp, Vp}, Acc0) ->
+                                Acc1 = maps:put(Ofp, Vp, Acc0),
+                                maps:put(Vp, Ofp, Acc1)
+                        end, #{}, PortsPairs),
+    update_patchp_wires_md(PatchpId, Wires).
+
+update_patchp_wires_md(PatchPId, Wires) ->
+    common_gen:publish(PatchPId, common_gen:merge_patchp_wires_md(Wires)).
+
+id(PrefixBin, SuffixPattern, Args) when PrefixBin =:= <<>> ->
+    list_to_binary(io_lib:format(SuffixPattern, Args));
+id(PrefixBin, SuffixPattern, Args) ->
+    SuffixBin = list_to_binary(io_lib:format(SuffixPattern, Args)),
+    <<PrefixBin/binary, "/", SuffixBin/binary>>.
+
+id(PrefixBin, Suffix) ->
+    id(PrefixBin, Suffix, []).
+
+
+
+
+
+
+
+
+
+

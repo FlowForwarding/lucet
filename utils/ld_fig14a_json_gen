@@ -1,7 +1,5 @@
 #!/usr/bin/env escript
 
--define(TYPE(T), {<<"type">>, atom_to_binary(T, utf8)}).
-
 main([Filename]) ->
     publish_fig_14_A(Filename, 2);
 main([Filename, NPortsS]) ->
@@ -23,7 +21,7 @@ publish_fig_14_A(Filename, NPorts) ->
      || VifLmVp <- VifPorts
     ],
     Wires = maps:from_list([{P, <<"null">>} || P <- VifPorts]),
-    common_gen:publish(Ph1PatchP, common_gen:update_patchp_wires_md(Wires)),
+    common_gen:publish(Ph1PatchP, common_gen:merge_patchp_wires_md(Wires)),
     common_gen:export_to_json(Filename).
 
 endpoints_with_ph1(NPorts) ->

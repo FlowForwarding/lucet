@@ -3,7 +3,7 @@
 -define(TYPE(T), {<<"type">>, atom_to_binary(T, utf8)}).
 
 -export([setup/0, publish/1, publish/2, publish/3, export_to_json/1,
-         update_patchp_wires_md/1]).
+         merge_patchp_wires_md/1]).
 
 -export([id_endpoint/1, id_lm_ph/1, id_lm_pp/1, id_lm_patchp/2, id_lm_vp/1,
          id_lm_vh/1, id_lm_of_port/1, id_lm_of_switch/1]).
@@ -32,7 +32,7 @@ publish(Endpoint, Metadata) ->
 export_to_json(Filename) ->
     ok = dby_bulk:export(json, Filename).
 
-update_patchp_wires_md(NewWires) ->
+merge_patchp_wires_md(NewWires) ->
     fun(MdProplist) ->
             Wires = proplists:get_value(<<"wires">>, MdProplist),
             [{<<"wires">>, maps:merge(NewWires, Wires)}
