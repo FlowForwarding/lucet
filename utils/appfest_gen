@@ -1,71 +1,78 @@
 #!/usr/bin/env escript
-
 -mode(compile).
 
--define(PH_NUM, 2).
--define(PP_NUM, 5).
--define(OFP_NUM, 4).
--define(VM_NUM, 1).
-
+-define(ALLOWED_ARGS_WITH_DEFAULTS,
+        [
+         {out, "output.json"}, %% JSON output filename
+         {physical_hosts, 2}, %% physical hosts
+         {physical_ports, 4}, %% physical ports per ph
+         {ofp_ports, 4}, %% OpenFlow ports per vh with LNICX
+         {virtual_hosts, 1} %% virtual hosts per ph apart from vh with LINCX
+        ]).
 -define(NULL, <<"null">>).
 
-main([Filename]) ->
+main(Args0) ->
     setup(),
-    publish_appfest_topo(),
-    common_gen:export_to_json(Filename).
+    Args1 = parse_args(Args0, ?ALLOWED_ARGS_WITH_DEFAULTS),
+    io:format(">> Running with args: ~p~n", [Args1]),
+    publish_appfest_topo(Args1),
+    common_gen:export_to_json(arg(out, Args1)).
 
-publish_appfest_topo() ->
+parse_args([ArgName0, ArgValue | Rest], Defaults) ->
+    %% we want to strip first character which is '-'
+    ArgName1 = list_to_atom(tl(ArgName0)),
+    proplists:is_defined(ArgName1, Defaults) orelse throw({bad_start_arg,
+                                                           ArgName1}),
+    case ArgName1 of
+        out ->
+            parse_args(Rest, [{ArgName1, ArgValue}
+                              | proplists:delete(ArgName1, Defaults)]);
+        _ ->
+            parse_args(Rest, [{ArgName1, list_to_integer(ArgValue)}
+                              | proplists:delete(ArgName1, Defaults)])
+    end;
+parse_args([], Args) ->
+    Args.
+
+arg(Name, Args) ->
+    proplists:get_value(Name, Args).
+
+publish_appfest_topo(Args) ->
     PhPorts0 = [begin
                   PhId = publish_ph_id(N),
-                  publish_ph(PhId)
-                end || N <- lists:seq(1, ?PH_NUM)],
+                  publish_ph(PhId, Args)
+                end || N <- lists:seq(1, arg(physical_hosts, Args))],
     PhPorts1 = lists:flatten(PhPorts0),
     set_unwired_patchp(PatchpId = publish_patchp_id(<<>>), PhPorts1),
     [publish_part_of_link(PatchpId, Id) || Id <- PhPorts1].
 
-%% daisychain_physical_hosts([First | _] = PPMaps) ->
-%%     daisychain_physical_hosts(First, PPMaps, []).
-
-%% daisychain_physical_hosts(First, [Current, Next | Rest], Connections) ->
-%%     A = maps:get(<<"PP2">>, Current),
-%%     B = maps:get(<<"PP3">>, Next),
-%%     daisychain_physical_hosts(First, [Next | Rest], [{A, B} | Connections]);
-%% daisychain_physical_hosts(First, [Last], Connections0) ->
-%%     %% Wire the first and the last.
-%%     %% Publish, but maybe there a patchp too?
-%%     Connections1 = [{maps:get(<<"PP2">>, Last),
-%%                      maps:get(<<"PP3">>, First)} | Connections0],
-%%     [publish_bound_to_link(A, B) || {A, B} <- Connections1].
-
-%% PH: Internal functions
-
-publish_ph(PhId) ->
-    PhPorts = publish_ph_ports(PhId),
-    LincxVifs = publish_lincx_vh(PhId),
-    VmsVifs = publish_vms(PhId),
+publish_ph(PhId, Args) ->
+    PhPorts = publish_ph_ports(PhId, Args),
+    LincxVifs = publish_lincx_vh(PhId, Args),
+    VmsVifs = publish_vms(PhId, Args),
     set_unwired_patchp(PatchpId = publish_patchp_id(PhId),
                        Ports = PhPorts ++ LincxVifs ++ VmsVifs),
     [publish_part_of_link(PatchpId, Id) || Id <- Ports],
     PhPorts.
 
-publish_ph_ports(PhId) ->
+publish_ph_ports(PhId, Args) ->
     [begin
          PpId = publish_pp_id(PhId, N),
          VpId = publish_vp_id(PhId, N),
          [publish_part_of_link(PhId, Id) || Id <- [PhId, VpId]],
          PpId
-     end || N <- lists:seq(1, ?PP_NUM)].
+     end || N <- lists:seq(1, arg(physical_ports, Args))].
 
 %% OFS: Internal functions
 
-publish_lincx_vh(PhId) ->
+publish_lincx_vh(PhId, Args) ->
     VhId = publish_vh_id(PhId, _VhNo = 1),
     PatchpId = publish_patchp_id(VhId),
-    {Ofps, Vps, Vifs} = publish_ofs(PhId, VhId, PatchpId),
+    {Ofps, Vps, Vifs} = publish_ofs(PhId, VhId, PatchpId, Args),
     set_wired_patchp(PatchpId, lists:zip(Ofps, Vps)),
     Vifs.
 
-publish_ofs(PhId, VhId, PatchpId) ->
+publish_ofs(PhId, VhId, PatchpId, Args) ->
     OfsId = publish_ofs_id(VhId, _OfsNo = 1),
     BoundedPorts =
         [begin
@@ -76,12 +83,12 @@ publish_ofs(PhId, VhId, PatchpId) ->
              [publish_part_of_link(VpId, Id) || Id <- [VhId, PatchpId]],
              [publish_bound_to_link(VpId, Id) || Id <- [OfpId, VifId]],
              {OfpId, VpId, VifId}
-         end || N <- lists:seq(1, ?OFP_NUM)],
+         end || N <- lists:seq(1, arg(ofp_ports, Args))],
     lists:unzip3(BoundedPorts).
 
 %% VM: Internal functions
 
-publish_vms(PhId) ->
+publish_vms(PhId, Args) ->
     [begin
          %% VH numbers for VMs start from 2
          VhNo = N + 1,
@@ -90,7 +97,7 @@ publish_vms(PhId) ->
          VifId = publish_vif_id(PhId, VhNo, _VifSuffix = 1),
          publish_bound_to_link(VifId, VpId),
          VifId
-     end || N <- lists:seq(1, ?VM_NUM)].
+     end || N <- lists:seq(1, arg(virtual_hosts, Args))].
 
 publish_vm_vp_with_ep(VmId, PatchpId) ->
     publish_part_of_link(VpId = publish_vp_id(VmId, _VPNo = 0), PatchpId),
@@ -183,13 +190,3 @@ id(PrefixBin, SuffixPattern, Args) ->
 
 id(PrefixBin, Suffix) ->
     id(PrefixBin, Suffix, []).
-
-
-
-
-
-
-
-
-
-
