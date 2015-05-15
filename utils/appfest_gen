@@ -1,4 +1,5 @@
 #!/usr/bin/env escript
+
 -mode(compile).
 
 -define(ALLOWED_ARGS_WITH_DEFAULTS,
@@ -106,10 +107,6 @@ publish_vm_vp_with_ep(VmId, PatchpId) ->
     set_wired_patchp(PatchpId, [{EpId, VpId}]),
     VpId.
 
-%% set_wired_patchp(PatchpId, Ports) ->
-%%     Wires = [maps:put(Id, ?NULL, #{}) || Id <- [EpId, VpId]],
-%%     update_patchp_wires_md(PatchpId, Wires).
-
 %% Internal functions: helpers
 
 setup() ->
@@ -117,7 +114,7 @@ setup() ->
     common_gen:setup().
 
 publish_patchp_id(Prefix) ->
-    PatchpId = id(Prefix, "Patchp"),
+    PatchpId = id(Prefix, "PatchP"),
     publish_id(common_gen:id_lm_patchp(PatchpId, #{})).
 
 publish_part_of_link(A, B) ->
