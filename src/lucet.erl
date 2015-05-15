@@ -1,6 +1,7 @@
 -module(lucet).
 
 -export([wire/2,
+         wire2/2,
 	 generate_domain_config/2]).
 
 -ifdef(TEST).
@@ -215,36 +216,62 @@ search_path_from_patchp_to_of_port(PatchP, OFPort) ->
                PatchP,
                [breadth, {max_depth, 100}]).
 
-%% @doc Finds the shortest path between two identifiers to be wired up.
--spec find_shortest_path_to_bound(dby_identifier(), dby_identifier()) ->
+%% @doc Finds a path between two identifiers to be bound.
+-spec find_path_to_bound(dby_identifier(), dby_identifier()) ->
                                         Result when
       Result :: [dby_identifier()] | not_found.
 
-find_shortest_path_to_bound(SrcId, DstId) ->
-    ?debugFmt("LINKS ~p~n", [dby:links(SrcId)]),
-    dby:search(find_shortest_path_to_bound_dby_fun(DstId),
-               not_found,
-               SrcId,
-               [breadth, {max_depth, 100}]).
+find_path_to_bound(SrcId, DstId) ->
+    Path = dby:search(find_path_to_bound_dby_fun(DstId),
+                      [],
+                      SrcId,
+                      [breadth, {max_depth, 100}]),
+    Path.
+    %% check_patch_panels_on_path(Path, []).
 
-find_shortest_path_to_bound_dby_fun(DstId) ->
-    fun(Id, Md, Path, Acc) ->
-            ?debugFmt("Id ~p~n Md ~p~n Path ~p~nAcc ~p~n", [Id, Md, Path, Acc]),
-            {contine, Acc}
+check_patch_panels_on_path([{P1Id, _, _} = PortA,
+                            {_, ?TYPE(<<"lm_patchp">>) = PatchPMd, _} = PatchP,
+                            {P2Id, _, _} = PortB | Rest], Acc) ->
+    #{<<"wires">> := #{value := WiresMap}} = PatchPMd,
+    case maps:get(P1Id, WiresMap) of
+        P2Id ->
+            %% The ports are connected; PatchP have to be removed from path
+            check_patch_panels_on_path(Rest, [PortB, PortA | Acc]);
+        _ ->
+            check_patch_panels_on_path(Rest, [PortB, PatchP, PortA | Acc])
+    end;
+check_patch_panels_on_path([], Acc) ->
+    lists:reverse(Acc);
+check_patch_panels_on_path([_ | Rest], Acc) ->
+    check_patch_panels_on_path(Rest, Acc).
+
+
+
+find_path_to_bound_dby_fun(DstId) ->
+    fun(_, #{<<"type">> := #{value := Type}}, _, Acc) when
+              Type =:= <<"lm_ph">> orelse
+              Type =:= <<"lm_vh">> orelse
+              Type =:= <<"of_Switch">> ->
+            {skip, Acc};
+       (Id, Md, Path, _) when Id =:= DstId ->
+            {stop, lists:reverse([{Id, Md, #{}} | Path])};
+       (_, _, _, Acc) ->
+            {continue, Acc}
     end.
-    %% fun(Id, #{<<"type">> := #{value := Type}}, _, Acc) when
-    %%           Type =:= <<"lm_ph">> orelse
-    %%           Type =:= <<"lm_vh">> orelse
-    %%           Type =:= <<"of_Switch">> ->
-    %%         ?debugFmt("FSP1 ~p",[Id]),
-    %%         {skip, Acc};
-    %%    (Id, _, Path, Acc) when Id =:= DstId ->
-    %%         ?debugFmt("FSP2 ~p",[Id]),
-    %%         {continue, [Path | Acc]};
-    %%    (Id, _, _, Acc) ->
-    %%         ?debugFmt("FSP3 ~p",[Id]),
-    %%         {continue, Acc}
-    %% end.
+
+wire2(SrcId, DstId) ->
+    Path = find_path_to_bound(SrcId, DstId),
+    bound_ports_on_patch_panel(Path).
+
+bound_ports_on_patch_panel([{P1Id, _, _} = _PortA,
+                            {PatchpId, ?TYPE(<<"lm_patchp">>), _},
+                            {P2Id, _, _} = _PortB | Rest]) ->
+    bound_ports_on_patch_panel(PatchpId, P1Id, P2Id),
+    bound_ports_on_patch_panel(Rest);
+bound_ports_on_patch_panel([]) ->
+    ok;
+bound_ports_on_patch_panel([_ | Rest]) ->
+    bound_ports_on_patch_panel(Rest).
 
 %% Tests
 
