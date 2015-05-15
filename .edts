@@ -1,3 +1,4 @@
 :name "lucet"
 :node-sname "lucet_edts"
 :lib-dirs '("deps" "test")
+:app-include-dirs '("include")
