@@ -3,6 +3,10 @@
 -export([wire/2,
 	 generate_domain_config/2]).
 
+-ifdef(TEST).
+-compile([export_all]).
+-endif.
+
 -define(JSON_FILE, "../lucet_design_fig14_A.json").
 -define(PI1_ID, <<"Pi1">>).
 -define(OFP1_ID, <<"PH1/VH1/OFS1/OFP1">>).
@@ -210,6 +214,37 @@ search_path_from_patchp_to_of_port(PatchP, OFPort) ->
                not_found,
                PatchP,
                [breadth, {max_depth, 100}]).
+
+%% @doc Finds the shortest path between two identifiers to be wired up.
+-spec find_shortest_path_to_bound(dby_identifier(), dby_identifier()) ->
+                                        Result when
+      Result :: [dby_identifier()] | not_found.
+
+find_shortest_path_to_bound(SrcId, DstId) ->
+    ?debugFmt("LINKS ~p~n", [dby:links(SrcId)]),
+    dby:search(find_shortest_path_to_bound_dby_fun(DstId),
+               not_found,
+               SrcId,
+               [breadth, {max_depth, 100}]).
+
+find_shortest_path_to_bound_dby_fun(DstId) ->
+    fun(Id, Md, Path, Acc) ->
+            ?debugFmt("Id ~p~n Md ~p~n Path ~p~nAcc ~p~n", [Id, Md, Path, Acc]),
+            {contine, Acc}
+    end.
+    %% fun(Id, #{<<"type">> := #{value := Type}}, _, Acc) when
+    %%           Type =:= <<"lm_ph">> orelse
+    %%           Type =:= <<"lm_vh">> orelse
+    %%           Type =:= <<"of_Switch">> ->
+    %%         ?debugFmt("FSP1 ~p",[Id]),
+    %%         {skip, Acc};
+    %%    (Id, _, Path, Acc) when Id =:= DstId ->
+    %%         ?debugFmt("FSP2 ~p",[Id]),
+    %%         {continue, [Path | Acc]};
+    %%    (Id, _, _, Acc) ->
+    %%         ?debugFmt("FSP3 ~p",[Id]),
+    %%         {continue, Acc}
+    %% end.
 
 %% Tests
 
