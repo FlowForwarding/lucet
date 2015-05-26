@@ -226,24 +226,24 @@ find_path_to_bound(SrcId, DstId) ->
                       [],
                       SrcId,
                       [breadth, {max_depth, 100}]),
-    Path.
-    %% check_patch_panels_on_path(Path, []).
+    filter_patch_panels_on_path(Path, []).
 
-check_patch_panels_on_path([{P1Id, _, _} = PortA,
-                            {_, ?TYPE(<<"lm_patchp">>) = PatchPMd, _} = PatchP,
-                            {P2Id, _, _} = PortB | Rest], Acc) ->
+%% @doc Filters patch panels between connected ports
+filter_patch_panels_on_path([{P1Id, _, _} = PortA,
+                             {_Id, ?TYPE(<<"lm_patchp">>) = PatchPMd, _} = PatchP,
+                             {P2Id, _, _} = PortB | Rest], Acc) ->
     #{<<"wires">> := #{value := WiresMap}} = PatchPMd,
     case maps:get(P1Id, WiresMap) of
         P2Id ->
             %% The ports are connected; PatchP have to be removed from path
-            check_patch_panels_on_path(Rest, [PortB, PortA | Acc]);
+            filter_patch_panels_on_path(Rest, [PortB, PortA | Acc]);
         _ ->
-            check_patch_panels_on_path(Rest, [PortB, PatchP, PortA | Acc])
+            filter_patch_panels_on_path(Rest, [PortB, PatchP, PortA | Acc])
     end;
-check_patch_panels_on_path([], Acc) ->
+filter_patch_panels_on_path([], Acc) ->
     lists:reverse(Acc);
-check_patch_panels_on_path([_ | Rest], Acc) ->
-    check_patch_panels_on_path(Rest, Acc).
+filter_patch_panels_on_path([Other | Rest], Acc) ->
+    filter_patch_panels_on_path(Rest, [Other | Acc]).
 
 
 
@@ -265,9 +265,9 @@ wire2(SrcId, DstId) ->
 
 bound_ports_on_patch_panel([{P1Id, _, _} = _PortA,
                             {PatchpId, ?TYPE(<<"lm_patchp">>), _},
-                            {P2Id, _, _} = _PortB | Rest]) ->
+                            {P2Id, _, _} = PortB | Rest]) ->
     bound_ports_on_patch_panel(PatchpId, P1Id, P2Id),
-    bound_ports_on_patch_panel(Rest);
+    bound_ports_on_patch_panel([PortB | Rest]);
 bound_ports_on_patch_panel([]) ->
     ok;
 bound_ports_on_patch_panel([_ | Rest]) ->

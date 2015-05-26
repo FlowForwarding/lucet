@@ -3,29 +3,28 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("dobby_clib/include/dobby.hrl").
 
-%% Topo generated ussing the following command:
+%% Topo generated using the following command:
 %% ./utils/appfest_gen -out lucet_design_fig_17_A.json -physical_ports 1 \
 %% -ofp_ports 2 -virtual_hosts 1 -physical_hosts 2
 -define(JSON_FILE, "../lucet_design_fig_17_A.json").
 
 -define(EP1, <<"PH1/VH2/EP1">>).
 -define(OFS1_OFP2, <<"PH1/VH1/OFS1/OFP2">>).
--define(EP1_TO_OFS1_OFP2_PATH,
+-define(EP1_TO_PH1_OFS1_OFP2,
         [?EP1, <<"PH1/VH2/VP0">>, <<"PH1/VP2.1">>, <<"PH1/PatchP">>,
          <<"PH1/VP1.2">>, <<"PH1/VH1/VP2">>, ?OFS1_OFP2]).
--define(EP1_TO_OFS1_OFP2_BOUNDED_PATH,
-        [?EP1, <<"PH1/VH2/VP0">>, <<"PH1/VP2.1">>, <<"PH1/VP1.2">>,
-         <<"PH1/VH1/VP2">>, ?OFS1_OFP2]).
 
 -define(PH1_OFS1_OFP1, <<"PH1/VH1/OFS1/OFP1">>).
 -define(PH2_OFS1_OFP1, <<"PH2/VH1/OFS1/OFP1">>).
--define(PH1_OFS1_OFP1_TO_PH2_OFS1_OFP1_PATH,
+-define(PH1_OFS1_OFP1_TO_PH2_OFS1_OFP1,
         [?PH1_OFS1_OFP1, <<"PH1/VH1/VP1">>, <<"PH1/VP1.1">>, <<"PH1/PatchP">>,
          <<"PH1/PP1">>, <<"PatchP">>, <<"PH2/PP1">>, <<"PH2/PatchP">>,
          <<"PH2/VP1.1">>, <<"PH2/VH1/VP1">>, ?PH2_OFS1_OFP1]).
--define(PH1_OFS1_OFP1_TO_PH2_OFS1_OFP1_BOUNDED_PATH,
-        [?PH1_OFS1_OFP1, <<"PH1/VH1/VP1">>, <<"PH1/VP1.1">>, <<"PH1/PP1">>,
-         <<"PH2/PP1">>, <<"PH2/VP1.1">>, <<"PH2/VH1/VP1">>, ?PH2_OFS1_OFP1]).
+
+-define(BOUNDED(X),lists:filter(fun(IdBin) ->
+                                        Id = binary_to_list(IdBin),
+                                        not lists:suffix("PatchP", Id)
+                                end, X)).
 
 %% Tests based on the topology shown in the figure 17A in the Lucet Desgin
 %% document:
@@ -55,7 +54,7 @@ it_finds_path_between_ep_and_ofp() ->
                            end, ActualPath0),
 
     %% THEN
-    ?assertEqual(?EP1_TO_OFS1_OFP2_PATH, ActualPath1).
+    ?assertEqual(?EP1_TO_PH1_OFS1_OFP2, ActualPath1).
 
 it_bounds_path_between_ep_and_ofp() ->
     %% GIVEN
@@ -70,7 +69,7 @@ it_bounds_path_between_ep_and_ofp() ->
     BoundedPath1 = lists:map(fun({Id, _, _}) ->
                                      Id
                              end, BoundedPath0),
-    ?assertEqual(?EP1_TO_OFS1_OFP2_BOUNDED_PATH, BoundedPath1).
+    ?assertEqual(?BOUNDED(?EP1_TO_PH1_OFS1_OFP2), BoundedPath1).
 
 it_finds_path_between_ofps() ->
     %% GIVEN
@@ -84,7 +83,7 @@ it_finds_path_between_ofps() ->
                             end, ActualPath0),
 
     %% THEN
-    ?assertEqual(?PH1_OFS1_OFP1_TO_PH2_OFS1_OFP1_PATH, ActualPath1).
+    ?assertEqual(?PH1_OFS1_OFP1_TO_PH2_OFS1_OFP1, ActualPath1).
 
 it_bounds_path_between_ofps() ->
     %% GIVEN
@@ -99,8 +98,7 @@ it_bounds_path_between_ofps() ->
     BoundedPath1 = lists:map(fun({Id, _, _}) ->
                                      Id
                              end, BoundedPath0),
-    ?debugFmt("FOUND: ~p~n", [BoundedPath1]),
-    ?assertEqual(?PH1_OFS1_OFP1_TO_PH2_OFS1_OFP1_BOUNDED_PATH, BoundedPath1).
+    ?assertEqual(?BOUNDED(?PH1_OFS1_OFP1_TO_PH2_OFS1_OFP1), BoundedPath1).
 
 %% Internal functions
 
