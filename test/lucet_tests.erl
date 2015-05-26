@@ -48,13 +48,10 @@ it_finds_path_between_ep_and_ofp() ->
     Dst = ?OFS1_OFP2,
 
     % WHEN
-    ActualPath0 = lucet:find_path_to_bound(Src, Dst),
-    ActualPath1 = lists:map(fun({Id, _, _}) ->
-                                   Id
-                           end, ActualPath0),
+    Path = find_path_to_be_bound(Src, Dst),
 
     %% THEN
-    ?assertEqual(?EP1_TO_PH1_OFS1_OFP2, ActualPath1).
+    ?assertEqual(?EP1_TO_PH1_OFS1_OFP2, Path).
 
 it_bounds_path_between_ep_and_ofp() ->
     %% GIVEN
@@ -65,11 +62,7 @@ it_bounds_path_between_ep_and_ofp() ->
     lucet:wire2(Src, Dst),
 
     %% THEN
-    BoundedPath0 = lucet:find_path_to_bound(Src, Dst),
-    BoundedPath1 = lists:map(fun({Id, _, _}) ->
-                                     Id
-                             end, BoundedPath0),
-    ?assertEqual(?BOUNDED(?EP1_TO_PH1_OFS1_OFP2), BoundedPath1).
+    assert_path_bounded(Src, Dst, ?EP1_TO_PH1_OFS1_OFP2).
 
 it_finds_path_between_ofps() ->
     %% GIVEN
@@ -77,13 +70,10 @@ it_finds_path_between_ofps() ->
     Dst = ?PH2_OFS1_OFP1,
 
     %% WHEN
-    ActualPath0 = lucet:find_path_to_bound(Src, Dst),
-    ActualPath1 = lists:map(fun({Id, _, _}) ->
-                                    Id
-                            end, ActualPath0),
+    Path = find_path_to_be_bound(Src, Dst),
 
     %% THEN
-    ?assertEqual(?PH1_OFS1_OFP1_TO_PH2_OFS1_OFP1, ActualPath1).
+    ?assertEqual(?PH1_OFS1_OFP1_TO_PH2_OFS1_OFP1, Path).
 
 it_bounds_path_between_ofps() ->
     %% GIVEN
@@ -94,11 +84,7 @@ it_bounds_path_between_ofps() ->
     lucet:wire2(Src, Dst),
 
     %% THEN
-    BoundedPath0 = lucet:find_path_to_bound(Src, Dst),
-    BoundedPath1 = lists:map(fun({Id, _, _}) ->
-                                     Id
-                             end, BoundedPath0),
-    ?assertEqual(?BOUNDED(?PH1_OFS1_OFP1_TO_PH2_OFS1_OFP1), BoundedPath1).
+    assert_path_bounded(Src, Dst, ?PH1_OFS1_OFP1_TO_PH2_OFS1_OFP1).
 
 %% Internal functions
 
@@ -107,3 +93,11 @@ setup_dobby() ->
     {ok, _} = application:ensure_all_started(dobby),
     ok = dby_mnesia:clear(),
     ok = dby_bulk:import(json, ?JSON_FILE).
+
+find_path_to_be_bound(Src, Dst) ->
+    Path = lucet:find_path_to_bound(Src, Dst),
+    lists:map(fun({Id, _, _}) -> Id end, Path).
+
+assert_path_bounded(Src, Dst, ExpectedPath) ->
+    Path = find_path_to_be_bound(Src, Dst),
+    ?assertEqual(?BOUNDED(ExpectedPath), Path).
