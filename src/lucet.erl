@@ -108,7 +108,7 @@ connect_endpoint_with_of_port(Endpoint, OFPort) ->
             assert_from_patchp_path_exists(FromPatchp),
             {PortA, PortB} =
                 ports_to_be_connected(ToPatchp ++ tl(FromPatchp), Patchp),
-            bound_ports_on_patch_panel(Patchp, PortA, PortB);
+            bind_ports_on_patch_panel(Patchp, PortA, PortB);
         _ExistingPath ->
             ok
     end.
@@ -192,7 +192,7 @@ get_bound_path_from_patchp_fun(Destination) ->
 %% It creates a bound_to link from `PortA' to `PortB' and updates
 %% wires metadata on the `PathchpId' indicating that the `PortA' and `PortB'
 %% are connected.
-bound_ports_on_patch_panel(PatchpId, PortA, PortB) ->
+bind_ports_on_patch_panel(PatchpId, PortA, PortB) ->
     ok = dby:publish(<<"lucet">>, PortA, PortB, [{<<"type">>, <<"bound_to">>}],
                      [persistent]),
     MdFun = fun(MdProplist) ->
@@ -261,17 +261,57 @@ find_path_to_bound_dby_fun(DstId) ->
 
 wire2(SrcId, DstId) ->
     Path = find_path_to_bound(SrcId, DstId),
-    bound_ports_on_patch_panel(Path).
+    Bindings = bind_ports_on_patch_panel(Path),
+    link_xenbrs_vp_to_vif_vp(Bindings).
 
-bound_ports_on_patch_panel([{P1Id, _, _} = _PortA,
-                            {PatchpId, ?TYPE(<<"lm_patchp">>), _},
-                            {P2Id, _, _} = PortB | Rest]) ->
-    bound_ports_on_patch_panel(PatchpId, P1Id, P2Id),
-    bound_ports_on_patch_panel([PortB | Rest]);
-bound_ports_on_patch_panel([]) ->
-    ok;
-bound_ports_on_patch_panel([_ | Rest]) ->
-    bound_ports_on_patch_panel(Rest).
+link_xenbrs_vp_to_vif_vp([{
+                            {P1Id, #{<<"type">> := #{value := P1Type}}, _},
+                            {_PatchpId, ?TYPE(<<"lm_patchp">>), _},
+                            {P2Id, #{<<"type">> := #{value := P2Type}}, _}
+                          } | Rest])
+  when P1Type =:= <<"lm_pp">> orelse P2Type =:= <<"lm_pp">> ->
+    {Pp, Vif} = case P1Type of
+                    <<"lm_pp">> ->
+                        {P1Id, P2Id};
+                    _ ->
+                        {P2Id, P1Id}
+                end,
+    XenbrVpId = find_xenbr_vp_for_physical_port(Pp),
+    link_xenbr_vp_to_vif_vp(XenbrVpId, Vif),
+    link_xenbrs_vp_to_vif_vp(Rest);
+link_xenbrs_vp_to_vif_vp([_Other | Rest]) ->
+    link_xenbrs_vp_to_vif_vp(Rest);
+link_xenbrs_vp_to_vif_vp([]) ->
+    ok.
+
+find_xenbr_vp_for_physical_port(Port) ->
+    Fun = fun(XenbrVpId, ?TYPE(<<"lm_vp">>),
+              [{_, _, ?TYPE(<<"part_of">>)}], _) ->
+                  {stop, XenbrVpId};
+             (Id, _, _, Acc) when Id =:= Port ->
+                  {continue, Acc};
+             (_, _, _, Acc) ->
+                  {skip, Acc}
+          end,
+    dby:search(Fun, not_found, Port, [breadth, {max_depth, 1}]).
+
+link_xenbr_vp_to_vif_vp(XenbrVpId, Port) ->
+    ok = dby:publish(<<"lucet">>, XenbrVpId, Port, [{<<"type">>, <<"part_of">>}],
+                     [persistent]).
+
+bind_ports_on_patch_panel(Path) ->
+    bind_ports_on_patch_panel(Path, []).
+
+bind_ports_on_patch_panel([{P1Id, _, _} = PortA,
+                            {PatchpId, ?TYPE(<<"lm_patchp">>), _} = Patchp,
+                            {P2Id, _, _} = PortB | Rest], Bindings) ->
+    bind_ports_on_patch_panel(PatchpId, P1Id, P2Id),
+    bind_ports_on_patch_panel([PortB | Rest],
+                              [{Patchp, PortA, PortB} | Bindings]);
+bind_ports_on_patch_panel([], Bindings) ->
+    Bindings;
+bind_ports_on_patch_panel([_ | Rest], Bindings) ->
+    bind_ports_on_patch_panel(Rest, Bindings).
 
 %% Tests
 
@@ -320,7 +360,7 @@ it_bounds_ports_on_patchp() ->
     PortB = ?PH1_VP11_ID,
 
     %% WHEN
-    bound_ports_on_patch_panel(PatchpId, PortA, PortB),
+    bind_ports_on_patch_panel(PatchpId, PortA, PortB),
 
     %% THEN
     %% Maybe we should only check that there's a bound_to link PortaA-PortB

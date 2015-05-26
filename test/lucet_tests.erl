@@ -88,6 +88,7 @@ it_bounds_path_between_ofps() ->
 
     %% THEN
     assert_path_bounded(Src, Dst, ?PH1_OFS1_OFP1_TO_PH2_OFS1_OFP1),
+    assert_xnebrs_between_pp_and_vif(?PH1_OFS1_OFP1_TO_PH2_OFS1_OFP1),
     assert_patch_panels_wired(?PH1_OFS1_OFP1_TO_PH2_OFS1_OFP1).
 
 %% Assertions
@@ -95,6 +96,27 @@ it_bounds_path_between_ofps() ->
 assert_path_bounded(Src, Dst, ExpectedPath) ->
     Path = find_path_to_be_bound(Src, Dst),
     ?assertEqual(?BOUNDED(ExpectedPath), Path).
+
+assert_xnebrs_between_pp_and_vif(UnboundedPath) ->
+    PatchPanelsWires = construct_expected_patch_panels_wires(UnboundedPath),
+    lists:foreach(fun({_PatchpId, PortA, PortB}) ->
+                          assert_part_of_path_between_pp_and_vif(PortA, PortB)
+                  end, PatchPanelsWires).
+
+assert_part_of_path_between_pp_and_vif(PortA, PortB) ->
+    %% TODO: Jak to obczaić?
+    Fun = fun(_, _, [{_, _, ?TYPE(<<"bound_to">>)}], Acc) ->
+                  {skip, Acc};
+             (_, #{<<"type">> := #{value := IdType}}, _, Acc) when
+                    IdType /= <<"lm_vp">> orelse IdType /= <<"lm_pp">> ->
+                  {skip, Acc};
+             (Id, _, _, _) when Id =:= PortB ->
+                  {stop, found};
+             (_, _, _, Acc) ->
+                  {continue, Acc}
+          end,
+    ?assertEqual(found,
+                 dby:search(Fun, not_found, PortA, [breadth, {max_depth, 2}])).
 
 assert_patch_panels_wired(UnboundedPath) ->
     PatchPanelsWires = construct_expected_patch_panels_wires(UnboundedPath),

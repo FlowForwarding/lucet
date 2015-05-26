@@ -60,7 +60,7 @@ publish_ph_ports(PhId, Args) ->
     [begin
          PpId = publish_pp_id(PhId, N),
          VpId = publish_vp_id(PhId, N),
-         [publish_part_of_link(PhId, Id) || Id <- [PpId, VpId]],
+         [publish_part_of_link(PpId, Id) || Id <- [PhId, VpId]],
          PpId
      end || N <- lists:seq(1, arg(physical_ports, Args))].
 
