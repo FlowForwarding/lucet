@@ -99,8 +99,8 @@ connect_endpoint_with_of_port(Endpoint, OFPort) ->
             ToPatchp = filter_out_md(ToPatchp0),
             Patchp = lists:last(ToPatchp),
             FromPatchp0 = search_path_from_patchp_to_of_port(Patchp, OFPort),
+            assert_from_patchp_path_exists(FromPatchp0),
             FromPatchp = filter_out_md(FromPatchp0),
-            assert_from_patchp_path_exists(FromPatchp),
             {PortA, PortB} =
                 ports_to_be_connected(ToPatchp ++ tl(FromPatchp), Patchp),
             bound_ports_on_patch_panel(Patchp, PortA, PortB);
