@@ -4,6 +4,9 @@
          wire2/2,
 	 generate_domain_config/2]).
 
+%% Diagnostics functions
+-export([get_bound_to_path/2]).
+
 -ifdef(TEST).
 -compile([export_all]).
 -endif.
@@ -20,6 +23,8 @@
 -define(PI1_TO_PH1_PATCHP_PATH, [?PI1_ID, <<"PH1/PP1">>, ?PH1_PATCHP_ID]).
 
 -define(TYPE(V), #{<<"type">> := #{value := V}}).
+-define(LINK_TYPE(V), [{_, _, ?TYPE(V)}]).
+-define(LINK_TYPE2(V), [{_, _, ?TYPE(V)} | _]).
 
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("dobby_clib/include/dobby.hrl").
@@ -68,6 +73,23 @@ generate_domain_config(PhysicalHost, MgmtIfMac) ->
 	    io:format(standard_error, "Patch panel ~s not found in dobby!~n", [PatchPanel]),
 	    {error, {not_found, PatchPanel}}
     end.
+
+get_bound_to_path(Src, Dst) ->
+    Fun = fun(Id, _, _, Acc) when Id =:= Src ->
+                  {continue, Acc};
+             (Id, _, Path0, _) when Id =:= Dst ->
+                  Path1 = lists:foldl(fun({PathId, _Md, _LkType}, Acc) ->
+                                      [PathId | Acc]
+                                      end, [], Path0),
+                  {stop, [Id | lists:reverse(Path1)]};
+             (_Id, _, ?LINK_TYPE(<<"bound_to">>), Acc) ->
+                  {continue, Acc};
+             (_Id, _, ?LINK_TYPE2(<<"bound_to">>), Acc) ->
+                  {continue, Acc};
+             (_Id, _, _, Acc) ->
+                  {skip, Acc}
+          end,
+    dby:search(Fun, not_found, Src, [breadth, {max_depth, 100}]).
 
 %% Internal functions
 
