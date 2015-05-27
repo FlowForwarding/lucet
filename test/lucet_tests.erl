@@ -37,11 +37,15 @@ ld_fig17a_test_() ->
      [{"Find path from EP to OFP",
        fun it_finds_path_between_ep_and_ofp/0},
       {"Bound path from EP to OFP",
-       fun it_bounds_path_between_ep_and_ofp/0},
+       fun it_binds_path_between_ep_and_ofp/0},
+      {"Bound already bounded path from EP to OFP",
+       fun it_binds_already_bounded_path_between_ep_and_ofp/0},
       {"Find path between OFPS",
        fun it_finds_path_between_ofps/0},
       {"Bound path between OFPS",
-       fun it_bounds_path_between_ofps/0}]}.
+       fun it_binds_path_between_ofps/0},
+      {"Bound already bounded path between OFPS",
+       fun it_binds_already_bounded_path_between_ofps/0}]}.
 
 %% Tests
 
@@ -56,18 +60,30 @@ it_finds_path_between_ep_and_ofp() ->
     %% THEN
     ?assertEqual(?EP1_TO_PH1_OFS1_OFP2, Path).
 
-it_bounds_path_between_ep_and_ofp() ->
+it_binds_path_between_ep_and_ofp() ->
     %% GIVEN
     Src = ?EP1,
     Dst = ?OFS1_OFP2,
 
     %% WHEN
-    lucet:wire2(Src, Dst),
+    ok = lucet:wire2(Src, Dst),
 
     %% THEN
     assert_path_bounded(Src, Dst, ?EP1_TO_PH1_OFS1_OFP2),
     assert_xnebrs_between_pp_and_vif(?EP1_TO_PH1_OFS1_OFP2),
     assert_patch_panels_wired(?EP1_TO_PH1_OFS1_OFP2).
+
+it_binds_already_bounded_path_between_ep_and_ofp() ->
+    %% GIVEN
+    Src = ?EP1,
+    Dst = ?OFS1_OFP2,
+
+    %% WHEN
+    ok = lucet:wire2(Src, Dst),
+
+    %% THEN
+    ?assertEqual(ok, lucet:wire2(Src, Dst)),
+    assert_path_bounded(Src, Dst, ?EP1_TO_PH1_OFS1_OFP2).
 
 it_finds_path_between_ofps() ->
     %% GIVEN
@@ -80,18 +96,30 @@ it_finds_path_between_ofps() ->
     %% THEN
     ?assertEqual(?PH1_OFS1_OFP1_TO_PH2_OFS1_OFP1, Path).
 
-it_bounds_path_between_ofps() ->
+it_binds_path_between_ofps() ->
     %% GIVEN
     Src = ?PH1_OFS1_OFP1,
     Dst = ?PH2_OFS1_OFP1,
 
     %% WHEN
-    lucet:wire2(Src, Dst),
+    ok = lucet:wire2(Src, Dst),
 
     %% THEN
     assert_path_bounded(Src, Dst, ?PH1_OFS1_OFP1_TO_PH2_OFS1_OFP1),
     assert_xnebrs_between_pp_and_vif(?PH1_OFS1_OFP1_TO_PH2_OFS1_OFP1),
     assert_patch_panels_wired(?PH1_OFS1_OFP1_TO_PH2_OFS1_OFP1).
+
+it_binds_already_bounded_path_between_ofps() ->
+    %% GIVEN
+    Src = ?PH1_OFS1_OFP1,
+    Dst = ?PH2_OFS1_OFP1,
+
+    %% WHEN
+    ok = lucet:wire2(Src, Dst),
+
+    %% THEN
+    ?assertEqual(ok, lucet:wire2(Src, Dst)),
+    assert_path_bounded(Src, Dst, ?PH1_OFS1_OFP1_TO_PH2_OFS1_OFP1).
 
 %% Assertions
 
