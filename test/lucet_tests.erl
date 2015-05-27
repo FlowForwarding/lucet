@@ -27,6 +27,7 @@
                                 end, X)).
 
 -define(TYPE(V), #{<<"type">> := #{value := V}}).
+-define(LINK_TYPE(V), [{_, _, ?TYPE(V)}]).
 
 %% Tests based on the topology shown in the figure 17A in the Lucet Desgin
 %% document:
@@ -65,6 +66,7 @@ it_bounds_path_between_ep_and_ofp() ->
 
     %% THEN
     assert_path_bounded(Src, Dst, ?EP1_TO_PH1_OFS1_OFP2),
+    assert_xnebrs_between_pp_and_vif(?EP1_TO_PH1_OFS1_OFP2),
     assert_patch_panels_wired(?EP1_TO_PH1_OFS1_OFP2).
 
 it_finds_path_between_ofps() ->
@@ -99,21 +101,23 @@ assert_path_bounded(Src, Dst, ExpectedPath) ->
 
 assert_xnebrs_between_pp_and_vif(UnboundedPath) ->
     PatchPanelsWires = construct_expected_patch_panels_wires(UnboundedPath),
-    lists:foreach(fun({_PatchpId, PortA, PortB}) ->
-                          assert_part_of_path_between_pp_and_vif(PortA, PortB)
-                  end, PatchPanelsWires).
+    lists:foreach(
+      fun({_PatchpId, PortA, PortB}) ->
+              are_identifiers_of_type_vp_and_pp(PortA, PortB)
+                  andalso assert_part_of_path_between_pp_and_vif(PortA, PortB)
+      end, PatchPanelsWires).
 
 assert_part_of_path_between_pp_and_vif(PortA, PortB) ->
-    %% TODO: Jak to obczaić?
-    Fun = fun(_, _, [{_, _, ?TYPE(<<"bound_to">>)}], Acc) ->
-                  {skip, Acc};
-             (_, #{<<"type">> := #{value := IdType}}, _, Acc) when
-                    IdType /= <<"lm_vp">> orelse IdType /= <<"lm_pp">> ->
-                  {skip, Acc};
+    Fun = fun(Id, _, _, Acc) when Id =:= PortA ->
+                  {continue, Acc};
              (Id, _, _, _) when Id =:= PortB ->
                   {stop, found};
+             %% If we are not in the start identifer or in the destination
+             %% we can only move to the xenbr virtual port
+             (_, ?TYPE(<<"lm_vp">>), ?LINK_TYPE(<<"part_of">>), Acc) ->
+                  {continue,  Acc};
              (_, _, _, Acc) ->
-                  {continue, Acc}
+                  {skip, Acc}
           end,
     ?assertEqual(found,
                  dby:search(Fun, not_found, PortA, [breadth, {max_depth, 2}])).
@@ -155,11 +159,20 @@ construct_expected_patch_panels_wires([IdBin | Rest], Passed, Wires0) ->
 construct_expected_patch_panels_wires([], _, Wires) ->
     Wires.
 
-
-
 find_patch_panel_wires(PatchpId) ->
     Fun = fun(_, ?TYPE(<<"lm_patchp">>) = Md, _, _) ->
                   #{<<"wires">> := #{value := Wires}} = Md,
                   {stop, Wires}
           end,
     dby:search(Fun, not_found, PatchpId, [breadth, {max_depth, 0}]).
+
+are_identifiers_of_type_vp_and_pp(PortA, PortB) ->
+    lists:sort([<<"lm_vp">>, <<"lm_pp">>]) =:=
+        lists:sort([find_identifier_type(Id) || Id <- [PortA, PortB]]).
+
+find_identifier_type(Id) ->
+    Fun = fun(_, #{<<"type">> := #{value := V}} , _, _) ->
+                  {stop, V}
+          end,
+    dby:search(Fun, not_found, Id, [breadth, {max_depth, 0}]).
+
