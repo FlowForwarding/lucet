@@ -103,7 +103,14 @@ connect_endpoint_with_of_port(Endpoint, OFPort) ->
             FromPatchp = filter_out_md(FromPatchp0),
             {PortA, PortB} =
                 ports_to_be_connected(ToPatchp ++ tl(FromPatchp), Patchp),
-            bound_ports_on_patch_panel(Patchp, PortA, PortB);
+            bound_ports_on_patch_panel(Patchp, PortA, PortB),
+	    %% Now that the physical port that Endpoint is connected
+	    %% to and the virtual port that OFPort is connected to
+	    %% have a link, we can publish a link between Endpoint and
+	    %% OFPort, so that Weave can get its job done.
+	    ok = dby:publish(<<"lucet">>, Endpoint, OFPort,
+			     [{<<"type">>, <<"connected_to">>}],
+			     [persistent]);
         _ExistingPath ->
             ok
     end.
