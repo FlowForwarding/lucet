@@ -1,7 +1,5 @@
 #!/usr/bin/env escript
 
--define(TYPE(T), {<<"type">>, atom_to_binary(T, utf8)}).
-
 main([Filename]) ->
     publish_fig_14_A(Filename, 2);
 main([Filename, NPortsS]) ->
@@ -19,116 +17,65 @@ publish_fig_14_A(Filename, NPorts) ->
     Ph1PatchP = endpoints_with_ph1(NPorts),
     VifPorts = vh1(NPorts),
     [
-     publish(VifLmVp, Ph1PatchP, lk_part_of_md())
+     common_gen:publish(VifLmVp, Ph1PatchP, common_gen:lk_part_of_md())
      || VifLmVp <- VifPorts
     ],
     Wires = maps:from_list([{P, <<"null">>} || P <- VifPorts]),
-    publish(Ph1PatchP, update_patchp_wires_md(Wires)),
-    export_to_json(Filename).
+    common_gen:publish(Ph1PatchP, common_gen:merge_patchp_wires_md(Wires)),
+    common_gen:export_to_json(Filename).
 
 endpoints_with_ph1(NPorts) ->
-    publish(id_lm_ph(LmPh = <<"PH1">>)),
+    common_gen:publish(common_gen:id_lm_ph(LmPh = <<"PH1">>)),
     %% Note the "PatchP" suffix; identifiers have to be unique
-    publish(id_lm_patchp(LmPatchP = <<"PH1/PatchP">>, #{})),
+    common_gen:publish(common_gen:id_lm_patchp(LmPatchP = <<"PH1/PatchP">>,
+                                               #{})),
     PhysicalPorts = [begin
                          LmVp = list_to_binary(io_lib:format("PH1/VP~p",[N])),
                          LmPp = list_to_binary(io_lib:format("PH1/PP~p",[N])),
                          Ep = list_to_binary(io_lib:format("Pi~p",[N])),
-                         publish(id_lm_vp(LmVp), id_lm_pp(LmPp), lk_part_of_md()),
-                         publish(LmPp, id_endpoint(Ep), lk_endpoint_md()),
-                         publish(LmPp, LmPh, lk_part_of_md()),
-                         publish(LmPp, LmPatchP, lk_part_of_md()),
+                         common_gen:publish(common_gen:id_lm_vp(LmVp),
+                                            common_gen:id_lm_pp(LmPp),
+                                            common_gen:lk_part_of_md()),
+                         common_gen:publish(LmPp,
+                                            common_gen:id_endpoint(Ep),
+                                            common_gen:lk_endpoint_md()),
+                         common_gen:publish(LmPp, LmPh,
+                                            common_gen:lk_part_of_md()),
+                         common_gen:publish(LmPp, LmPatchP,
+                                            common_gen:lk_part_of_md()),
                          LmPp
                      end || N <- lists:seq(1, NPorts)],
     Wires = maps:from_list([{P, <<"null">>} || P <- PhysicalPorts]),
-    publish(LmPatchP, [{<<"wires">>, Wires}]),
+    common_gen:publish(LmPatchP, [{<<"wires">>, Wires}]),
     LmPatchP.
 
 vh1(NPorts) ->
-    publish(id_lm_vh(LmVh = <<"PH1/VH1">>)),
+    common_gen:publish(common_gen:id_lm_vh(LmVh = <<"PH1/VH1">>)),
     %% Note the "PatchP" suffix; identifiers have to be unique
-    publish(id_lm_patchp(LmPatchP = <<"PH1/VH1/PatchP">>, #{})),
-    publish(id_lm_of_switch(LmOfSwitch = <<"PH1/VH1/OFS1">>)),
+    common_gen:publish(common_gen:id_lm_patchp(LmPatchP = <<"PH1/VH1/PatchP">>,
+                                               #{})),
+    common_gen:publish(common_gen:id_lm_of_switch(LmOfSwitch = <<"PH1/VH1/OFS1">>)),
     [begin
          VifLmVp = list_to_binary(io_lib:format("PH1/VP1.~p",[N])),
          LmVp = list_to_binary(io_lib:format("PH1/VH1/VP~p",[N])),
          LmOfPort = list_to_binary(io_lib:format("PH1/VH1/OFS1/OFP~p",[N])),
          %% part of
-         publish(id_lm_vp(LmVp), LmPatchP, lk_part_of_md()),
-         publish(LmVp, LmVh, lk_part_of_md()),
-         publish(id_lm_of_port(LmOfPort), LmPatchP, lk_part_of_md()),
-         publish(LmOfPort, LmOfSwitch, lk_part_of_md()),
+         common_gen:publish(common_gen:id_lm_vp(LmVp), LmPatchP,
+                            common_gen:lk_part_of_md()),
+         common_gen:publish(LmVp, LmVh, common_gen:lk_part_of_md()),
+         common_gen:publish(common_gen:id_lm_of_port(LmOfPort), LmPatchP,
+                            common_gen:lk_part_of_md()),
+         common_gen:publish(LmOfPort, LmOfSwitch, common_gen:lk_part_of_md()),
          %% bound to
-         publish(id_lm_vp(VifLmVp), LmVp, lk_bound_to_md()),
-         publish(LmVp, LmOfPort, lk_bound_to_md()),
+         common_gen:publish(common_gen:id_lm_vp(VifLmVp), LmVp,
+                            common_gen:lk_bound_to_md()),
+         common_gen:publish(LmVp, LmOfPort, common_gen:lk_bound_to_md()),
          VifLmVp
      end || N <- lists:seq(1, NPorts)].
 
-%% identifiers
 
-id_endpoint(Name) ->
-    {Name, [?TYPE(endpoint)]}.
-
-id_lm_ph(Name) ->
-    {Name, [?TYPE(lm_ph)]}.
-
-id_lm_pp(Name) ->
-    {Name, [?TYPE(lm_pp)]}.
-
-id_lm_patchp(Name, Wires) ->
-    {Name, [?TYPE(lm_patchp), {<<"wires">>, Wires}]}.
-
-id_lm_vp(Name) ->
-    {Name, [?TYPE(lm_vp)]}.
-
-id_lm_vh(Name) ->
-    {Name, [?TYPE(lm_vh)]}.
-
-id_lm_of_port(Name) ->
-    %% The type should be 'lm_of_port' but for now weave and dobby_oflib
-    %% operate just on 'of_port'
-    {Name, [?TYPE(of_port)]}.
-
-id_lm_of_switch(Name) ->
-    %% The type should be 'lm_of_switch' but for now weave and dobby_oflib
-    %% operate just on 'of_switch'
-    {Name, [?TYPE(of_switch)]}.
-
-%% Links
-
-lk_bound_to_md() ->
-    [?TYPE(bound_to)].
-
-lk_part_of_md() ->
-    [?TYPE(part_of)].
-
-lk_endpoint_md() ->
-    [].
-
-%% Misc
+%% Internal functions
 
 setup() ->
-    [os:cmd(io_lib:format("rm -rf ~p", [Dir]))
-     || Dir <- filelib:wildcard("utils/Mnesia*"), filelib:is_dir(Dir)],
-    code:add_pathsa(filelib:wildcard("deps/*/ebin")),
-    {ok, _} = application:ensure_all_started(dobby),
-    dby_mnesia:clear().
-
-publish(Src, Dst, LinkMetadata) ->
-    dby:publish(<<"lucet">>, Src, Dst, LinkMetadata, [persistent]).
-
-publish(Endpoint) ->
-    dby:publish(<<"lucet">>, Endpoint, [persistent]).
-
-publish(Endpoint, Metadata) ->
-    dby:publish(<<"lucet">>, {Endpoint, Metadata}, [persistent]).
-
-export_to_json(Filename) ->
-    ok = dby_bulk:export(json, Filename).
-
-update_patchp_wires_md(NewWires) ->
-    fun(MdProplist) ->
-            Wires = proplists:get_value(<<"wires">>, MdProplist),
-            [{<<"wires">>, maps:merge(NewWires, Wires)}
-             | proplists:delete(<<"wires">>, MdProplist)]
-    end.
+    {ok, common_gen} = compile:file("utils/common_gen"),
+    common_gen:setup().
