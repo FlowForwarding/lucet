@@ -4,8 +4,8 @@ Wiring Compiler
 
 ## Generating example JSON files ##
 
-`utils/ld_fig14a_json_gen topo.json`
-`./utils/appfest_gen -out appfest.json -physical_ports 10 -physical_hosts 4 -ofp_ports 4 -virtual_hosts 1`
+- `utils/ld_fig14a_json_gen topo.json`
+- `./utils/appfest_gen -out appfest.json -physical_ports 10 -physical_hosts 4 -ofp_ports 4 -virtual_hosts 1`
 
 The defaults values are:
 
