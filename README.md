@@ -20,9 +20,25 @@ The defaults values are:
 ## Running the compiler ##
 
 1. Start the Lucet Wiring Compile and import the topoloy file that will
-be imported into the Dobby server that will be brought up along with Lucet:
+be imported into a local Dobby server that will be brought up along with Lucet:
 
-`make run topo=lucet_design_fig_17_A.json `
+`make run topo=lucet_design_fig_17_A.json`
+
+Alternativley, you can connect to an existing dobby using:
+
+`make connect`
+
+In that case, you must import the topology into dobby using the dobby shell:
+
+```erlang
+dby_bulk:import(json, ".../lucet_design_fig_17_A.json").
+```
+
+On the lucet shell you must install the lucet search functions into dobby before doing any operations:
+
+```erlang
+dby:install(lucet).
+```
 
 2. Verify that the topology is imported:
 
