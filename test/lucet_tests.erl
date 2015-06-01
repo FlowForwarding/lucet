@@ -69,6 +69,7 @@ it_binds_path_between_ep_and_ofp() ->
     ok = lucet:wire2(Src, Dst),
 
     %% THEN
+    assert_src_connected_to_dst(Src, Dst),
     assert_path_bounded(Src, Dst, ?EP1_TO_PH1_OFS1_OFP2),
     assert_xnebrs_between_pp_and_vif(?EP1_TO_PH1_OFS1_OFP2),
     assert_patch_panels_wired(?EP1_TO_PH1_OFS1_OFP2).
@@ -105,6 +106,7 @@ it_binds_path_between_ofps() ->
     ok = lucet:wire2(Src, Dst),
 
     %% THEN
+    assert_src_connected_to_dst(Src, Dst),
     assert_path_bounded(Src, Dst, ?PH1_OFS1_OFP1_TO_PH2_OFS1_OFP1),
     assert_xnebrs_between_pp_and_vif(?PH1_OFS1_OFP1_TO_PH2_OFS1_OFP1),
     assert_patch_panels_wired(?PH1_OFS1_OFP1_TO_PH2_OFS1_OFP1).
@@ -123,9 +125,32 @@ it_binds_already_bounded_path_between_ofps() ->
 
 %% Assertions
 
+assert_src_connected_to_dst(Src, Dst) ->
+    Links = dby:links(Src),
+    ?assertMatch({Dst, ?TYPE(<<"connected_to">>)},
+                 lists:keyfind(Dst, 1, Links)).
+
 assert_path_bounded(Src, Dst, ExpectedPath) ->
-    Path = find_path_to_be_bound(Src, Dst),
-    ?assertEqual(?BOUNDED(ExpectedPath), Path).
+    Fun = fun(_, #{<<"type">> := #{value := Type}}, _, Acc) when
+              Type =:= <<"lm_ph">> orelse
+              Type =:= <<"lm_vh">> orelse
+              Type =:= <<"of_Switch">> ->
+            {skip, Acc};
+       (Id, Md, [{_, _, #{<<"type">> := #{value := LinkT}}} | _ ] = Path, Acc)
+          when Id =:= Dst ->
+            case LinkT of
+                <<"connected_to">> ->
+                    {skip, Acc};
+                <<"bound_to">> ->
+                    {stop, lists:reverse([{Id, Md, #{}} | Path])}
+            end;
+       (_, _, _, Acc) ->
+            {continue, Acc}
+    end,
+    Path = dby:search(Fun, not_found, Src,
+                      [breadth, {max_depth, 100}, {loop, link}]),
+    ?assertEqual(?BOUNDED(ExpectedPath), lists:map(fun({Id, _, _}) -> Id end,
+                                                   Path)).
 
 assert_xnebrs_between_pp_and_vif(UnboundedPath) ->
     PatchPanelsWires = construct_expected_patch_panels_wires(UnboundedPath),

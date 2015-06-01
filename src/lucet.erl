@@ -297,7 +297,13 @@ wire2(SrcId, DstId) ->
     {module, _} = dby:install(?MODULE),
     Path = find_path_to_bound(SrcId, DstId),
     Bindings = bind_ports_on_patch_panel(Path),
+    create_connected_to_link(SrcId, DstId),
     link_xenbrs_vp_to_vif_vp(Bindings).
+
+create_connected_to_link(SrcId, DstId) ->
+    ok = dby:publish(<<"lucet">>, SrcId, DstId,
+                     [{<<"type">>, <<"connected_to">>}],
+                     [persistent]).
 
 link_xenbrs_vp_to_vif_vp([{
                             {P1Id, #{<<"type">> := #{value := P1Type}}, _},
