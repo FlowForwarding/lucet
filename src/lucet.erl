@@ -32,10 +32,14 @@
 %% API
 
 wire(Endpoint, OFPort) ->
+    global:sync(),
+    {module, _} = dby:install(?MODULE),
     connect_endpoint_with_of_port(Endpoint, OFPort),
     generate_domain_config_and_run_vm().
 
 generate_domain_config(PhysicalHost, MgmtIfMac) ->
+    global:sync(),
+    {module, _} = dby:install(?MODULE),
     %% TODO: use domain config template file
     PatchPanel = PhysicalHost ++ "/PatchP",
     case dby:search(
