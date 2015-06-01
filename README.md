@@ -19,7 +19,8 @@ The defaults values are:
 
 ## Running the compiler ##
 
-1. Start the Lucet Wiring Compile and import the topoloy file that will
+### Start Lucet and Dobby
+Start the Lucet Wiring Compile and import the topoloy file that will
 be imported into a local Dobby server that will be brought up along with Lucet:
 
 `make run topo=lucet_design_fig_17_A.json`
@@ -34,13 +35,15 @@ In that case, you must import the topology into dobby using the dobby shell:
 dby_bulk:import(json, ".../lucet_design_fig_17_A.json").
 ```
 
-On the lucet shell you must install the lucet search functions into dobby before doing any operations:
+And on the lucet shell you must install the lucet search functions into dobby before doing any operations:
 
 ```erlang
 dby:install(lucet).
 ```
 
-2. Verify that the topology is imported:
+### Check topoilogy import
+
+Verify that the topology is imported:
 
 ```erlang
 3> dby:links(<<"PH1">>).
@@ -50,20 +53,24 @@ dby:install(lucet).
       value => <<"part_of">>}}}]
 ```
 
-3. Wire `PH1/VH1/OFS1/OFP1` with `PH2/VH1/OFS1/OFP1`:
+### Create wires
+
+Wire `PH1/VH1/OFS1/OFP1` with `PH2/VH1/OFS1/OFP1`:
 
 ```erlang
 lucet:wire2(<<"PH1/VH1/OFS1/OFP1">>, <<"PH2/VH1/OFS1/OFP1">>).
 ```
 
-4. Wire `PH1/VH1/OFS1/OFP2` with `PH1/VH2/EP1` and `PH2/VH1/OFS1/OFP2` with `PH2/VH2/EP1`:
+Wire `PH1/VH1/OFS1/OFP2` with `PH1/VH2/EP1` and `PH2/VH1/OFS1/OFP2` with `PH2/VH2/EP1`:
 
 ```erlang
 lucet:wire2(<<"PH1/VH1/OFS1/OFP2">>, <<"PH1/VH2/EP1">>).
 lucet:wire2(<<"PH2/VH1/OFS1/OFP2">>, <<"PH2/VH2/EP1">>).
 ```
 
-5. Verify that the `bound_to` path exists between wired identifiers:
+### Verify wires
+
+Verify that the `bound_to` path exists between wired identifiers:
 
 ```erlang
 lucet:get_bound_to_path(<<"PH1/VH1/OFS1/OFP2">>, <<"PH1/VH2/EP1">>).
