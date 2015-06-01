@@ -50,16 +50,17 @@ dby:install(lucet).
       value => <<"part_of">>}}}]
 ```
 
-3. Wire `PH1/VH1/OFS1/OFP1` with `PH2/VH1/OFS/OFP2`:
+3. Wire `PH1/VH1/OFS1/OFP1` with `PH2/VH1/OFS1/OFP1`:
 
 ```erlang
 lucet:wire2(<<"PH1/VH1/OFS1/OFP1">>, <<"PH2/VH1/OFS1/OFP1">>).
 ```
 
-4. Wire `PH1/VH1/OFS1/OFP2` with `PH1/VH2/EP1`:
+4. Wire `PH1/VH1/OFS1/OFP2` with `PH1/VH2/EP1` and `PH2/VH1/OFS1/OFP2` with `PH2/VH2/EP1`:
 
 ```erlang
 lucet:wire2(<<"PH1/VH1/OFS1/OFP2">>, <<"PH1/VH2/EP1">>).
+lucet:wire2(<<"PH2/VH1/OFS1/OFP2">>, <<"PH2/VH2/EP1">>).
 ```
 
 5. Verify that the `bound_to` path exists between wired identifiers:

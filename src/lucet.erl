@@ -293,6 +293,8 @@ find_path_to_bound_dby_fun(DstId) ->
     end.
 
 wire2(SrcId, DstId) ->
+    global:sync(),
+    {module, _} = dby:install(?MODULE),
     Path = find_path_to_bound(SrcId, DstId),
     Bindings = bind_ports_on_patch_panel(Path),
     link_xenbrs_vp_to_vif_vp(Bindings).
