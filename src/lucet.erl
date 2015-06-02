@@ -286,8 +286,6 @@ filter_patch_panels_on_path([], Acc) ->
 filter_patch_panels_on_path([Other | Rest], Acc) ->
     filter_patch_panels_on_path(Rest, [Other | Acc]).
 
-
-
 find_path_to_bound_dby_fun(DstId) ->
     fun(_, #{<<"type">> := #{value := Type}}, _, Acc) when
               Type =:= <<"lm_ph">> orelse
@@ -311,9 +309,10 @@ wire2(SrcId, DstId) ->
 	{start_node_not_found, _} = Error ->
 	    {error, Error};
 	Path when is_list(Path) ->
-	    Bindings = bind_ports_on_patch_panel(Path),
-	    create_connected_to_link(SrcId, DstId),
-	    link_xenbrs_vp_to_vif_vp(Bindings)
+            Path = find_path_to_bound(SrcId, DstId),
+            Bindings = bind_ports_on_patch_panel(Path),
+            create_connected_to_link(SrcId, DstId),
+            link_xenbrs(Bindings)
     end.
 
 create_connected_to_link(SrcId, DstId) ->
@@ -321,25 +320,43 @@ create_connected_to_link(SrcId, DstId) ->
                      [{<<"type">>, <<"connected_to">>}],
                      [persistent]).
 
-link_xenbrs_vp_to_vif_vp([{
-                            {P1Id, #{<<"type">> := #{value := P1Type}}, _},
-                            {_PatchpId, ?TYPE(<<"lm_patchp">>), _},
-                            {P2Id, #{<<"type">> := #{value := P2Type}}, _}
-                          } | Rest])
-  when P1Type =:= <<"lm_pp">> orelse P2Type =:= <<"lm_pp">> ->
-    {Pp, Vif} = case P1Type of
-                    <<"lm_pp">> ->
-                        {P1Id, P2Id};
-                    _ ->
-                        {P2Id, P1Id}
-                end,
-    XenbrVpId = find_xenbr_vp_for_physical_port(Pp),
-    link_xenbr_vp_to_vif_vp(XenbrVpId, Vif),
-    link_xenbrs_vp_to_vif_vp(Rest);
-link_xenbrs_vp_to_vif_vp([_Other | Rest]) ->
-    link_xenbrs_vp_to_vif_vp(Rest);
-link_xenbrs_vp_to_vif_vp([]) ->
+link_xenbrs([{
+               {PatchpId, ?TYPE(<<"lm_patchp">>), _},
+               {P1Id, #{<<"type">> := #{value := P1Type}}, _},
+               {P2Id, #{<<"type">> := #{value := P2Type}}, _}
+             } | Rest]) ->
+    {XenbrId, LinkTo} = case {P1Type, P2Type} of
+                            {<<"lm_pp">>, <<"lm_pp">>} ->
+                                {no_xenbr_between_physical_ports, []};
+                            {<<"lm_pp">>, _} ->
+                                {find_xenbr_vp_for_physical_port(P1Id),
+                                 [P2Id]};
+                            {_, <<"lm_pp">>} ->
+                                {find_xenbr_vp_for_physical_port(P2Id),
+                                 [P1Id]};
+                            _ ->
+                                PhId = find_patchp_ph(PatchpId),
+                                {publish_xenbr_for_ph(PhId),
+                                 [P1Id, P2Id]}
+                        end,
+    link_xenbrs(XenbrId, LinkTo),
+    link_xenbrs(Rest);
+link_xenbrs([_Other | Rest]) ->
+    link_xenbrs(Rest);
+link_xenbrs([]) ->
     ok.
+
+publish_xenbr_for_ph(PhId) ->
+    XenbrId = <<PhId/binary, "/VP2">>,
+    ok = dby:publish(<<"lucet">>, {XenbrId, [{<<"type">>, <<"lm_vp">>}]},
+                     [persistent]),
+    XenbrId.
+
+find_patchp_ph(PatchpId) ->
+    PatchpIdS = binary_to_list(PatchpId),
+    Tokens0 = string:tokens(PatchpIdS, "/"),
+    Tokens1 = lists:droplast(Tokens0),
+    list_to_binary(string:join(Tokens1, "/")).
 
 find_xenbr_vp_for_physical_port(Port) ->
     Fun = fun(XenbrVpId, ?TYPE(<<"lm_vp">>),
@@ -352,16 +369,18 @@ find_xenbr_vp_for_physical_port(Port) ->
           end,
     dby:search(Fun, not_found, Port, [breadth, {max_depth, 1}]).
 
-link_xenbr_vp_to_vif_vp(XenbrVpId, Port) ->
-    ok = dby:publish(<<"lucet">>, XenbrVpId, Port, [{<<"type">>, <<"part_of">>}],
-                     [persistent]).
+link_xenbrs(_, []) ->
+    ok;
+link_xenbrs(XenbrId, Ports) ->
+    [ok = dby:publish(<<"lucet">>, XenbrId, P, [{<<"type">>, <<"part_of">>}],
+                      [persistent]) || P <- Ports].
 
 bind_ports_on_patch_panel(Path) ->
     bind_ports_on_patch_panel(Path, []).
 
 bind_ports_on_patch_panel([{P1Id, _, _} = PortA,
-                            {PatchpId, ?TYPE(<<"lm_patchp">>), _} = Patchp,
-                            {P2Id, _, _} = PortB | Rest], Bindings) ->
+                           {PatchpId, ?TYPE(<<"lm_patchp">>), _} = Patchp,
+                           {P2Id, _, _} = PortB | Rest], Bindings) ->
     bind_ports_on_patch_panel(PatchpId, P1Id, P2Id),
     bind_ports_on_patch_panel([PortB | Rest],
                               [{Patchp, PortA, PortB} | Bindings]);

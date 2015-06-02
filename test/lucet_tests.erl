@@ -34,7 +34,8 @@
 %% https://docs.google.com/document/d/1Gtoi8IX1EN3oWDRPTFa_VltOdJAwRbl_ChAZWk8oKIk/edit#
 ld_fig17a_test_() ->
     {foreach, fun setup_dobby/0, fun(_) -> ok end,
-     [{"Find path from EP to OFP",
+     [
+      {"Find path from EP to OFP",
        fun it_finds_path_between_ep_and_ofp/0},
       {"Bound path from EP to OFP",
        fun it_binds_path_between_ep_and_ofp/0},
@@ -45,7 +46,8 @@ ld_fig17a_test_() ->
       {"Bound path between OFPS",
        fun it_binds_path_between_ofps/0},
       {"Bound already bounded path between OFPS",
-       fun it_binds_already_bounded_path_between_ofps/0}]}.
+       fun it_binds_already_bounded_path_between_ofps/0}
+     ]}.
 
 %% Tests
 
@@ -71,7 +73,7 @@ it_binds_path_between_ep_and_ofp() ->
     %% THEN
     assert_src_connected_to_dst(Src, Dst),
     assert_path_bounded(Src, Dst, ?EP1_TO_PH1_OFS1_OFP2),
-    assert_xnebrs_between_pp_and_vif(?EP1_TO_PH1_OFS1_OFP2),
+    assert_xnebrs_setup(?EP1_TO_PH1_OFS1_OFP2),
     assert_patch_panels_wired(?EP1_TO_PH1_OFS1_OFP2).
 
 it_binds_already_bounded_path_between_ep_and_ofp() ->
@@ -108,7 +110,7 @@ it_binds_path_between_ofps() ->
     %% THEN
     assert_src_connected_to_dst(Src, Dst),
     assert_path_bounded(Src, Dst, ?PH1_OFS1_OFP1_TO_PH2_OFS1_OFP1),
-    assert_xnebrs_between_pp_and_vif(?PH1_OFS1_OFP1_TO_PH2_OFS1_OFP1),
+    assert_xnebrs_setup(?PH1_OFS1_OFP1_TO_PH2_OFS1_OFP1),
     assert_patch_panels_wired(?PH1_OFS1_OFP1_TO_PH2_OFS1_OFP1).
 
 it_binds_already_bounded_path_between_ofps() ->
@@ -152,19 +154,26 @@ assert_path_bounded(Src, Dst, ExpectedPath) ->
     ?assertEqual(?BOUNDED(ExpectedPath), lists:map(fun({Id, _, _}) -> Id end,
                                                    Path)).
 
-assert_xnebrs_between_pp_and_vif(UnboundedPath) ->
+assert_xnebrs_setup(UnboundedPath) ->
     PatchPanelsWires = construct_expected_patch_panels_wires(UnboundedPath),
     lists:foreach(
       fun({_PatchpId, PortA, PortB}) ->
-              are_identifiers_of_type_vp_and_pp(PortA, PortB)
-                  andalso assert_part_of_path_between_pp_and_vif(PortA, PortB)
+              not (is_id_physical_port(PortA) andalso is_id_physical_port(PortB))
+                  andalso assert_xenbr_between_ports(PortA, PortB)
       end, PatchPanelsWires).
 
-assert_part_of_path_between_pp_and_vif(PortA, PortB) ->
+assert_xenbr_between_ports(PortA, PortB) ->
     Fun = fun(Id, _, _, Acc) when Id =:= PortA ->
                   {continue, Acc};
-             (Id, _, _, _) when Id =:= PortB ->
-                  {stop, found};
+             (Id, _, Path, Acc) when Id =:= PortB ->
+                  case length(Path) of
+                      1 ->
+                          %% PortB reached directly from PortA
+                          {skip, Acc};
+                      2 ->
+                          %% PortB reached via xenbr identifier
+                          {stop, found}
+                  end;
              %% If we are not in the start identifer or in the destination
              %% we can only move to the xenbr virtual port
              (_, ?TYPE(<<"lm_vp">>), ?LINK_TYPE(<<"part_of">>), Acc) ->
@@ -172,8 +181,8 @@ assert_part_of_path_between_pp_and_vif(PortA, PortB) ->
              (_, _, _, Acc) ->
                   {skip, Acc}
           end,
-    ?assertEqual(found,
-                 dby:search(Fun, not_found, PortA, [breadth, {max_depth, 2}])).
+    ?assertEqual(found, dby:search(Fun, not_found, PortA,
+                                   [breadth, {max_depth, 2}, {loop, link}])).
 
 assert_patch_panels_wired(UnboundedPath) ->
     PatchPanelsWires = construct_expected_patch_panels_wires(UnboundedPath),
@@ -219,9 +228,8 @@ find_patch_panel_wires(PatchpId) ->
           end,
     dby:search(Fun, not_found, PatchpId, [breadth, {max_depth, 0}]).
 
-are_identifiers_of_type_vp_and_pp(PortA, PortB) ->
-    lists:sort([<<"lm_vp">>, <<"lm_pp">>]) =:=
-        lists:sort([find_identifier_type(Id) || Id <- [PortA, PortB]]).
+is_id_physical_port(Id) ->
+    find_identifier_type(Id) =:= <<"lm_pp">>.
 
 find_identifier_type(Id) ->
     Fun = fun(_, #{<<"type">> := #{value := V}} , _, _) ->
