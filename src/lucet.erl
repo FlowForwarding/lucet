@@ -34,7 +34,7 @@
 wire(Endpoint, OFPort) ->
     global:sync(),
     {module, _} = dby:install(?MODULE),
-    connect_endpoint_with_of_port(Endpoint, OFPort),
+    ok = connect_endpoint_with_of_port(Endpoint, OFPort),
     generate_domain_config_and_run_vm().
 
 generate_domain_config(PhysicalHost, MgmtIfMac) ->
@@ -126,6 +126,8 @@ generate_domain_config_and_run_vm() ->
 
 connect_endpoint_with_of_port(Endpoint, OFPort) ->
     case search_bound_path_from_endpoint_to_of_port(Endpoint, OFPort) of
+	{start_node_not_found, _} = Error ->
+	    {error, Error};
         {not_found, ToPatchp0} ->
             ToPatchp = filter_out_md(ToPatchp0),
             Patchp = lists:last(ToPatchp),
@@ -175,8 +177,10 @@ ports_to_be_connected([], _) ->
 
 get_bound_path_from_endpoint_fun(Destination) ->
     %% first identifier: an endpoint
-    fun(_Id, ?TYPE(<<"endpoint">>), [], Acc) ->
-            {continue, Acc};
+    fun(_Id, ?TYPE(<<"endpoint">>), [], _Acc) ->
+            %% At this point, Acc contains {start_node_not_found, Id}.
+            %% Time to overwrite that.
+            {continue, []};
        %% second identifier: physical port
        (_Id, ?TYPE(<<"lm_pp">>), [{_, ?TYPE(<<"endpoint">>), _ } |  _], Acc) ->
             {continue, Acc};
@@ -239,7 +243,7 @@ bind_ports_on_patch_panel(PatchpId, PortA, PortB) ->
 
 search_bound_path_from_endpoint_to_of_port(Endpoint, OFPort) ->
     dby:search(get_bound_path_from_endpoint_fun(OFPort),
-               [],
+               {start_node_not_found, Endpoint},
                Endpoint,
                [breadth, {max_depth, 100}]).
 
@@ -255,11 +259,15 @@ search_path_from_patchp_to_of_port(PatchP, OFPort) ->
       Result :: [dby_identifier()] | not_found.
 
 find_path_to_bound(SrcId, DstId) ->
-    Path = dby:search(find_path_to_bound_dby_fun(DstId),
-                      [],
-                      SrcId,
-                      [breadth, {max_depth, 100}]),
-    filter_patch_panels_on_path(Path, []).
+    case dby:search(find_path_to_bound_dby_fun(DstId),
+		    {start_node_not_found, SrcId},
+		    SrcId,
+		    [breadth, {max_depth, 100}]) of
+	{start_node_not_found, _} = Error ->
+	    Error;
+	Path when is_list(Path) ->
+	    filter_patch_panels_on_path(Path, [])
+    end.
 
 %% @doc Filters patch panels between connected ports
 filter_patch_panels_on_path([{P1Id, _, _} = PortA,
@@ -286,6 +294,10 @@ find_path_to_bound_dby_fun(DstId) ->
               Type =:= <<"lm_vh">> orelse
               Type =:= <<"of_Switch">> ->
             {skip, Acc};
+       (_, _, [], _Acc) ->
+	    %% The first node (path is empty).
+	    %% Forget {start_node_not_found, SrcId}.
+	    {continue, []};
        (Id, Md, Path, _) when Id =:= DstId ->
             {stop, lists:reverse([{Id, Md, #{}} | Path])};
        (_, _, _, Acc) ->
@@ -295,10 +307,14 @@ find_path_to_bound_dby_fun(DstId) ->
 wire2(SrcId, DstId) ->
     global:sync(),
     {module, _} = dby:install(?MODULE),
-    Path = find_path_to_bound(SrcId, DstId),
-    Bindings = bind_ports_on_patch_panel(Path),
-    create_connected_to_link(SrcId, DstId),
-    link_xenbrs_vp_to_vif_vp(Bindings).
+    case find_path_to_bound(SrcId, DstId) of
+	{start_node_not_found, _} = Error ->
+	    {error, Error};
+	Path when is_list(Path) ->
+	    Bindings = bind_ports_on_patch_panel(Path),
+	    create_connected_to_link(SrcId, DstId),
+	    link_xenbrs_vp_to_vif_vp(Bindings)
+    end.
 
 create_connected_to_link(SrcId, DstId) ->
     ok = dby:publish(<<"lucet">>, SrcId, DstId,
