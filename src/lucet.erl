@@ -2,7 +2,7 @@
 
 -export([wire/2,
          wire2/2,
-	 generate_domain_config/2]).
+         generate_domain_config/2]).
 
 %% Diagnostics functions
 -export([get_bound_to_path/2]).
@@ -347,10 +347,17 @@ link_xenbrs([]) ->
     ok.
 
 publish_xenbr_for_ph(PhId) ->
-    XenbrId = <<PhId/binary, "/VP2">>,
+    Timestamp = list_to_binary(str_time()),
+    XenbrId = <<PhId/binary, "/", "INXEN", "/", Timestamp/binary>>,
     ok = dby:publish(<<"lucet">>, {XenbrId, [{<<"type">>, <<"lm_vp">>}]},
                      [persistent]),
     XenbrId.
+
+str_time() ->
+    {{Year, Month, Day}, {Hour, Minute, Second}} =
+        calendar:now_to_datetime(erlang:now()),
+    lists:flatten(io_lib:format("~4..0w-~2..0w-~2..0wT~2..0w:~2..0w:~2..0w",
+                                [Year,Month,Day,Hour,Minute,Second])).
 
 find_patchp_ph(PatchpId) ->
     PatchpIdS = binary_to_list(PatchpId),
