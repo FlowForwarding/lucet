@@ -2,7 +2,8 @@
 
 -export([wire/2,
          wire2/2,
-         generate_domain_config/2]).
+         generate_lincx_domain_config/2,
+         generate_vm_domain_config/2]).
 
 %% Diagnostics functions
 -export([get_bound_to_path/2]).
@@ -29,6 +30,7 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("dobby_clib/include/dobby.hrl").
 
+
 %% API
 
 wire(Endpoint, OFPort) ->
@@ -37,7 +39,7 @@ wire(Endpoint, OFPort) ->
     ok = connect_endpoint_with_of_port(Endpoint, OFPort),
     generate_domain_config_and_run_vm().
 
-generate_domain_config(PhysicalHost, MgmtIfMac) ->
+generate_lincx_domain_config(PhysicalHost, MgmtIfMac) ->
     global:sync(),
     {module, _} = dby:install(?MODULE),
     %% TODO: use domain config template file
@@ -76,6 +78,36 @@ generate_domain_config(PhysicalHost, MgmtIfMac) ->
 	not_found ->
 	    io:format(standard_error, "Patch panel ~s not found in dobby!~n", [PatchPanel]),
 	    {error, {not_found, PatchPanel}}
+    end.
+
+generate_vm_domain_config(PhysicalHost, VmNo) ->
+    global:sync(),
+    {module, _} = dby:install(?MODULE),
+    VmVif = string:join([PhysicalHost, "VP" ++ integer_to_list(VmNo) ++ ".1"],
+                        "/"),
+    case dby:search(
+           fun(_, _, [], Acc) ->
+                   {continue, Acc};
+              (Id,
+               #{<<"type">> := #{value := <<"lm_vp">>}},
+               [{_, _, #{<<"type">> := #{value := <<"part_of">>}}}],
+               _Acc) ->
+                   {stop, {found, Id}};
+              (_, _, _, Acc) ->
+                   {skip, Acc}
+           end,
+           not_found,
+           list_to_binary(VmVif),
+           [{max_depth, 2}]) of
+        {found, InxenbrId} ->
+            VifString = "vif = ['bridge="
+                ++ "xenbr" ++ integer_to_list(100 + VmNo) ++ "'" ++
+                "]\n",
+            io:format("~s~n", [VifString]);
+        not_found ->
+            io:format(standard_error, "Bridge for VM vif ~s not found in dobby!~n",
+                      [VmVif]),
+            {error, not_found}
     end.
 
 get_bound_to_path(Src, Dst) ->
@@ -347,8 +379,8 @@ link_xenbrs([]) ->
     ok.
 
 publish_xenbr_for_ph(PhId) ->
-    Timestamp = list_to_binary(str_time()),
-    XenbrId = <<PhId/binary, "/", "INXEN", "/", Timestamp/binary>>,
+    Id = list_to_binary(erlang:ref_to_list(make_ref())),
+    XenbrId = <<PhId/binary, "/", "INXEN", "/", Id/binary>>,
     ok = dby:publish(<<"lucet">>, {XenbrId, [{<<"type">>, <<"lm_vp">>}]},
                      [persistent]),
     XenbrId.
