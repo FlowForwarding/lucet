@@ -39,19 +39,76 @@ wire(Endpoint, OFPort) ->
     ok = connect_endpoint_with_of_port(Endpoint, OFPort),
     generate_domain_config_and_run_vm().
 
-generate_lincx_domain_config(PhysicalHost, MgmtIfMac) ->
+generate_lincx_domain_config(VirtualHost, MgmtIfMac) ->
     global:sync(),
     {module, _} = dby:install(?MODULE),
     %% TODO: use domain config template file
-    PatchPanel = PhysicalHost ++ "/PatchP",
     case dby:search(
-	   fun(_, #{<<"wires">> := #{value := Wires}}, _, _) ->
-		   {stop, {found, Wires}}
+	   %% First, ensure we can find the specified virtual host.
+	   fun(VirtualHostId, #{<<"type">> := #{value := <<"lm_vh">>}}, [], Acc)
+		 when VirtualHostId =:= VirtualHost ->
+		   {continue, Acc#{virtual_host_found := true}};
+	      %% A virtual port, directly connected to the virtual host.
+	      %% Let's keep those in a list.
+	      (VirtualPortId, #{<<"type">> := #{value := <<"lm_vp">>}},
+	       [{VirtualHostId, #{}, #{<<"type">> := #{value := <<"part_of">>}}}],
+	       Acc = #{virtual_ports := VirtualPorts})
+		 when VirtualHostId =:= VirtualHost ->
+		   {continue, Acc#{virtual_ports := [VirtualPortId | VirtualPorts]}};
+	      %% A VIF, bound to one of our virtual ports.
+	      (_, #{<<"type">> := #{value := <<"lm_vp">>}},
+	       [{_, #{<<"type">> := #{value := <<"lm_vp">>}}, #{<<"type">> := #{value := <<"bound_to">>}}},
+		{VirtualHostId, #{}, #{<<"type">> := #{value := <<"part_of">>}}}],
+	       Acc)
+		 when VirtualHostId =:= VirtualHost ->
+		   {continue, Acc};
+	      %% A patch panel.  Keep going.
+	      (_, #{<<"type">> := #{value := <<"lm_patchp">>}}, _, Acc) ->
+		   {continue, Acc};
+	      %% A physical port.  Keep going.
+	      (_, #{<<"type">> := #{value := <<"lm_pp">>}}, _, Acc) ->
+		   {continue, Acc};
+	      %% We've reached the physical host, and it has a
+	      %% physical port that is part of a patch panel.  This is
+	      %% the patch panel we're looking for.
+	      (PhysicalHost, #{<<"type">> := #{value := <<"lm_ph">>}},
+	       [{_, #{<<"type">> := #{value := <<"lm_pp">>}},
+		 #{<<"type">> := #{value := <<"part_of">>}}},
+		{PatchPanelId, #{<<"type">> := #{value := <<"lm_patchp">>},
+				 <<"wires">> := #{value := Wires}},
+		 #{<<"type">> := #{value := <<"part_of">>}}}
+		| _],
+	       Acc = #{patch_panel_found := false}) ->
+		   {continue, Acc#{patch_panel_found := true,
+				   patch_panel_id => PatchPanelId,
+				   wires => Wires,
+				   physical_host_id => PhysicalHost}};
+
+	      %% Skip everything else
+	      (_, _, _, Acc) ->
+		   {skip, Acc}
 	   end,
-	   not_found,
-	   list_to_binary(PatchPanel),
-	   [{max_depth, 1}]) of
-	{found, Wires} ->
+	   #{virtual_host_found => false,
+	     patch_panel_found => false,
+	     virtual_ports => []},
+	   VirtualHost,
+	   %% TODO: fix max_depth
+	   [breadth, {max_depth, 10}]) of
+
+	#{virtual_host_found := false} ->
+	    io:format(standard_error, "Virtual host '~s' not found~n", [VirtualHost]),
+	    {error, virtual_host_not_found};
+
+	#{patch_panel_found := false} ->
+	    io:format(standard_error, "Patch panel not found~n", []),
+	    {error, patch_panel_not_found};
+
+	#{patch_panel_id := PatchPanelId,
+	  wires := Wires,
+	  virtual_ports := VirtualPorts,
+	  physical_host_id := PhysicalHost} ->
+	    %% TODO: match up virtual ports to bridge interfaces.
+	    %% Probably need to extract from Dobby.
 	    FirstVif = {MgmtIfMac, "xenbr0"},
 	    MgmtIfMacNo = mac_string_to_number(MgmtIfMac),
 	    OtherVifs =
@@ -59,7 +116,7 @@ generate_lincx_domain_config(PhysicalHost, MgmtIfMac) ->
 		  fun(_Port1, <<"null">>, Acc) ->
 			  Acc;
 		     (Port1, Port2, Acc) ->
-			  case re:run(Port1, "^" ++ PhysicalHost ++ "/PP([0-9]+)$", [{capture, all_but_first, list}]) of
+			  case re:run(Port1, <<"^", PhysicalHost/binary, "/PP([0-9]+)$">>, [{capture, all_but_first, list}]) of
 			      {match, [IfNo]} ->
 				  MacNo = MgmtIfMacNo + list_to_integer(IfNo),
 				  [{mac_number_to_string(MacNo), "xenbr" ++ IfNo}] ++ Acc;
@@ -74,10 +131,7 @@ generate_lincx_domain_config(PhysicalHost, MgmtIfMac) ->
 			    ",\n       ") ++
 		"]\n",
 	    io:format("~s~n", [VifString]),
-	    ok;
-	not_found ->
-	    io:format(standard_error, "Patch panel ~s not found in dobby!~n", [PatchPanel]),
-	    {error, {not_found, PatchPanel}}
+	    ok
     end.
 
 generate_vm_domain_config(PhysicalHost, VmNo) ->
