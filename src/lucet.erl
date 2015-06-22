@@ -340,9 +340,25 @@ search_path_from_patchp_to_of_port(PatchP, OFPort) ->
                [breadth, {max_depth, 100}]).
 
 %% @doc Finds a path between two identifiers to be bound.
+%%
+%% This function returns a list of identifiers between `SrcId' and `DstId'
+%% in the order as they appear in Dobby. The identifiers can be
+%% one of the following:
+%% 1) OpenFlow Port identifiers (lm_of_port),
+%% 2) Virtual Port identifiers (lm_vp),
+%% 3) Physical Port identifiers (lm_pp),
+%% 4) Endpoint identifiers (endpoint),
+%% 5) Patch Panel (lm_patchp).
+%%
+%% A links between those identifiers are expected to be of type `bound_to`
+%% apart from Patch Panel identifiers which are linked via `part_of`
+%% with other identifiers.
 -spec find_path_to_bound(dby_identifier(), dby_identifier()) ->
                                         Result when
-      Result :: [dby_identifier()] | not_found.
+      Result :: [{Id :: dby_identifier(),
+                  IdMetadata :: metadata_info(),
+                  LinkMetadata :: metadata_info()}]
+              | {start_node_not_found, dby_identifier()}.
 
 find_path_to_bound(SrcId, DstId) ->
     case dby:search(find_path_to_bound_dby_fun(DstId),
@@ -353,9 +369,11 @@ find_path_to_bound(SrcId, DstId) ->
 	    Error;
 	Path when is_list(Path) ->
 	    filter_patch_panels_on_path(Path, [])
+            %% TODO: add case for empy list and return empty path error
     end.
 
 %% @doc Filters patch panels between connected ports
+%% TODO: TO be removed
 filter_patch_panels_on_path([{P1Id, _, _} = PortA,
                              {_Id, ?TYPE(<<"lm_patchp">>) = PatchPMd, _} = PatchP,
                              {P2Id, _, _} = PortB | Rest], Acc) ->
@@ -372,6 +390,9 @@ filter_patch_panels_on_path([], Acc) ->
 filter_patch_panels_on_path([Other | Rest], Acc) ->
     filter_patch_panels_on_path(Rest, [Other | Acc]).
 
+%% @doc Finds a path to bound that ends on `DstId'.
+%%
+%% TODO: Check wires MD
 find_path_to_bound_dby_fun(DstId) ->
     fun(_, #{<<"type">> := #{value := Type}}, _, Acc) when
               Type =:= <<"lm_ph">> orelse
@@ -387,6 +408,35 @@ find_path_to_bound_dby_fun(DstId) ->
        (_, _, _, Acc) ->
             {continue, Acc}
     end.
+
+%% @doc Creates `bound to` path between `SrcId' and `DstId' in Dobby.
+%%
+%% If `ScrId' or the path doesn't exist an error is returned.
+%%
+%% A `bound to` path can only consist of:
+%% 1) OpenFlow Port identifiers (lm_of_port),
+%% 2) Virtual Port identifiers (lm_vp),
+%% 3) Physical Port identifiers (lm_pp),
+%% 4) Endpoint identifiers (endpoint),
+%% 5) Patch Panel (lm_patchp).
+%%
+%% When a `bound to` link is created between two ports, A and B
+%% (they have to be attached to the same Patch Panel), the `wires` meta-data
+%% on their Patch Panel is updated. Two entries are added to the `wires`
+%% meta-data map: A => B, B => A.
+%%
+%% Each `bound to` link between Physical Port and Virtual Port
+%% has its corresponding xen bridge (xenbr{X} where X is a number). Before
+%% wiring occurs, Physical Port is assumed to be linked  to the bridge
+%% as `part of`. The wiring process is responsible for creating a `part of`
+%% link between the bridge and VP.
+%%
+%% Each `bound to` link between two Virtual Ports has its corresponding
+%% xen bridge.  The wiring process is responsible for creating an
+%% identifier for the xen bridge and its `part of` links to the Virtual Ports.
+%% The bridge name is `inbr_vif{X}_vif{Y}` where X and Y are vif interfaces'
+%% numbers associated with VPs that are linked.
+-spec wire2(dby_identifier(), dby_identifier()) -> ok | {error, term()}.
 
 wire2(SrcId, DstId) ->
     global:sync(),
@@ -405,6 +455,30 @@ create_connected_to_link(SrcId, DstId) ->
     ok = dby:publish(<<"lucet">>, SrcId, DstId,
                      [{<<"type">>, <<"connected_to">>}],
                      [persistent]).
+
+%% @doc Sets up identifiers for xen bridges in Dobby.
+%%
+%% The functions takes a list of bindings that were published into the
+%% Dobby. A `Binding' is associated with a `bound_to' link that was published
+%% for two port attached to the same Patch Panel. For each such a `Binding'
+%% a xen bridge identifier needs to be set up appropriately.
+%%
+%% Each `bound to` link between Physical Port and Virtual Port
+%% has its corresponding xen bridge (xenbr{X} where X is a number). Before
+%% wiring occurs, Physical Port is assumed to be linked  to the bridge
+%% as `part of`. The wiring process is responsible for creating a `part of`
+%% link between the bridge and VP.
+%%
+%% Each `bound to` link between two Virtual Ports has its corresponding
+%% xen bridge.  The wiring process is responsible for creating an
+%% identifier for the xen bridge and its `part of` links to the Virtual Ports.
+%% The bridge name is `inbr_vif{X}_vif{Y}` where X and Y are vif interfaces'
+%% numbers associated with VPs that are linked.
+-spec link_xenbrs([Binding]) -> ok when
+      Binding :: [{PathElement, PathElement, PathElement}],
+      PathElement :: {Id :: dby_identifier(),
+                      IdMetadata :: metadata_info(),
+                      LinkMetadata :: metadata_info()}.
 
 link_xenbrs([{
                {PatchpId, ?TYPE(<<"lm_patchp">>), _},
@@ -468,8 +542,32 @@ link_xenbrs(XenbrId, Ports) ->
     [ok = dby:publish(<<"lucet">>, XenbrId, P, [{<<"type">>, <<"part_of">>}],
                       [persistent]) || P <- Ports].
 
+
 bind_ports_on_patch_panel(Path) ->
     bind_ports_on_patch_panel(Path, []).
+
+
+%% @doc Creates `bound_to` links and return new bindings.
+%%
+%% `Path' is expected to be a list of tuples containing identifier,
+%% its metadata and link metadata that led to this identifier while searching
+%% for a path to be bound. The tuples are ordered as they appear in Dobby.
+%% The identifiers can be one of the following:
+%% 1) OpenFlow Port identifiers (lm_of_port),
+%% 2) Virtual Port identifiers (lm_vp),
+%% 3) Physical Port identifiers (lm_pp),
+%% 4) Endpoint identifiers (endpoint),
+%% 5) Patch Panel (lm_patchp).
+%%
+%% This function looks for Patch Panel identifiers and creates a `bound_to`
+%% link between its two neighbouring ports.
+%%
+%% It allso accumulates newly created bindings that are returned.
+-spec bind_ports_on_patch_panel([PathElement]) -> Bindings when
+      PathElement :: {Id :: dby_identifier(),
+                      IdMetadata :: metadata_info(),
+                      LinkMetadata :: metadata_info()},
+      Bindings :: [{PathElement, PathElement, PathElement}].
 
 bind_ports_on_patch_panel([{P1Id, _, _} = PortA,
                            {PatchpId, ?TYPE(<<"lm_patchp">>), _} = Patchp,
