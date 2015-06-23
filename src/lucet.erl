@@ -332,7 +332,7 @@ create_connected_to_link(SrcId, DstId) ->
                       LinkMetadata :: metadata_info()}.
 
 link_xenbrs([{
-               {PatchpId, ?TYPE(<<"lm_patchp">>), _},
+               {_PatchpId, ?TYPE(<<"lm_patchp">>), _},
                {P1Id, #{<<"type">> := #{value := P1Type}}, _},
                {P2Id, #{<<"type">> := #{value := P2Type}}, _}
              } | Rest]) ->
@@ -346,8 +346,8 @@ link_xenbrs([{
                                 {find_xenbr_vp_for_physical_port(P2Id),
                                  [P1Id]};
                             _ ->
-                                PhId = find_patchp_ph(PatchpId),
-                                {publish_xenbr_for_ph(PhId),
+                                %% PhId = find_patchp_ph(PatchpId),
+                                {publish_inbr_for_ph(P1Id, P2Id),
                                  [P1Id, P2Id]}
                         end,
     link_xenbrs(XenbrId, LinkTo),
@@ -357,12 +357,15 @@ link_xenbrs([_Other | Rest]) ->
 link_xenbrs([]) ->
     ok.
 
-publish_xenbr_for_ph(PhId) ->
-    Id = list_to_binary(erlang:ref_to_list(make_ref())),
-    XenbrId = <<PhId/binary, "/", "INXEN", "/", Id/binary>>,
-    ok = dby:publish(<<"lucet">>, {XenbrId, [{<<"type">>, <<"lm_vp">>}]},
+publish_inbr_for_ph(P1Id, P2Id) ->
+    {Prefix, Rest1} = split_identifier_into_prefix_and_rest(P1Id),
+    {Prefix, Rest2} = split_identifier_into_prefix_and_rest(P2Id),
+    InbrId0 = io_lib:format("~s/inbr_~s_~s",
+                            [Prefix | lists:sort([Rest1, Rest2])]),
+    InbrId1 = re:replace(InbrId0, "VP", "vif", [global, {return, binary}]),
+    ok = dby:publish(<<"lucet">>, {InbrId1, [{<<"type">>, <<"lm_vp">>}]},
                      [persistent]),
-    XenbrId.
+    InbrId1.
 
 find_patchp_ph(PatchpId) ->
     PatchpIdS = binary_to_list(PatchpId),
@@ -440,3 +443,13 @@ bind_ports_on_patch_panel(PatchpId, PortA, PortB) ->
                                                               MdProplist)]
             end,
     ok = dby:publish(<<"lucet">>, {PatchpId, MdFun}, [persistent]).
+
+split_identifier_into_prefix_and_rest(Identifier) ->
+    IdentifierS = binary_to_list(Identifier),
+    case string:tokens(IdentifierS, "/") of
+        IdentifierS ->
+            "";
+        Tokens0 ->
+            Tokens1 = lists:droplast(Tokens0),
+            {string:join(Tokens1, "/"), hd(lists:reverse(Tokens0))}
+    end.
