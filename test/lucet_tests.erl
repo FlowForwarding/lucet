@@ -26,6 +26,12 @@
                                         not lists:suffix("PatchP", Id)
                                 end, X)).
 
+-define(INBR_ID(PortA, PortB), case lists:sort([PortA, PortB]) of
+                                   [<<"PH1/VP1.2">>, <<"PH1/VP2.1">>] ->
+                                       <<"PH1/inbr_vif1.2_vif2.1">>
+                               end).
+
+
 -define(TYPE(V), #{<<"type">> := #{value := V}}).
 -define(LINK_TYPE(V), [{_, _, ?TYPE(V)}]).
 
@@ -158,22 +164,26 @@ assert_xnebrs_setup(UnboundedPath) ->
     PatchPanelsWires = construct_expected_patch_panels_wires(UnboundedPath),
     lists:foreach(
       fun({_PatchpId, PortA, PortB}) ->
-              not (is_id_physical_port(PortA) andalso is_id_physical_port(PortB))
-                  andalso assert_xenbr_between_ports(PortA, PortB)
+              assert_xenbr_setup_between_ports(
+                            {find_identifier_type(PortA), PortA},
+                            {find_identifier_type(PortB), PortB})
       end, PatchPanelsWires).
 
-assert_xenbr_between_ports(PortA, PortB) ->
+assert_xenbr_setup_between_ports({<<"lm_pp">>, _}, {<<"lm_pp">>, _}) ->
+    ok;
+assert_xenbr_setup_between_ports({TypeA, PortA}, {TypeB, PortB}) when
+      TypeA =:= <<"lm_pp">> orelse TypeB =:= <<"lm_pp">> ->
+    assert_xenbr_connections_setup(PortA, PortB);
+assert_xenbr_setup_between_ports({<<"lm_vp">>, PortA}, {<<"lm_vp">>, PortB}) ->
+    assert_inbr_xenbr_setup(PortA, PortB),
+    assert_xenbr_connections_setup(PortA, PortB).
+
+assert_inbr_xenbr_setup(PortA, PortB) ->
     Fun = fun(Id, _, _, Acc) when Id =:= PortA ->
                   {continue, Acc};
-             (Id, _, Path, Acc) when Id =:= PortB ->
-                  case length(Path) of
-                      1 ->
-                          %% PortB reached directly from PortA
-                          {skip, Acc};
-                      2 ->
-                          %% PortB reached via xenbr identifier
-                          {stop, found}
-                  end;
+             (Id, _, [{InbrId, InbrMd, _} | _] = Path, Acc)
+                when Id =:= PortB andalso length(Path) =:= 2 ->
+                  {stop, {InbrId, InbrMd}};
              %% If we are not in the start identifer or in the destination
              %% we can only move to the xenbr virtual port
              (_, ?TYPE(<<"lm_vp">>), ?LINK_TYPE(<<"part_of">>), Acc) ->
@@ -181,8 +191,25 @@ assert_xenbr_between_ports(PortA, PortB) ->
              (_, _, _, Acc) ->
                   {skip, Acc}
           end,
-    ?assertEqual(found, dby:search(Fun, not_found, PortA,
-                                   [breadth, {max_depth, 2}, {loop, link}])).
+    ExpectedInbrId1 = ?INBR_ID(PortA, PortB),
+    ?assertMatch({ExpectedInbrId1, ?TYPE(<<"lm_vp">>)},
+                 dby:search(Fun, not_found, PortA,
+                            [breadth, {max_depth, 2}, {loop, link}])).
+
+assert_xenbr_connections_setup(PortA, PortB) ->
+    Fun = fun(Id, _, _, Acc) when Id =:= PortA ->
+                  {continue, Acc};
+             (Id, _, Path, Acc) when Id =:= PortB andalso length(Path) =:= 2 ->
+                  {stop, ok};
+             %% If we are not in the start identifer or in the destination
+             %% we can only move to the xenbr virtual port
+             (_, ?TYPE(<<"lm_vp">>), ?LINK_TYPE(<<"part_of">>), Acc) ->
+                  {continue,  Acc};
+             (_, _, _, Acc) ->
+                  {skip, Acc}
+          end,
+    ?assertEqual(ok, dby:search(Fun, not_found, PortA,
+                                [breadth, {max_depth, 2}, {loop, link}])).
 
 assert_patch_panels_wired(UnboundedPath) ->
     PatchPanelsWires = construct_expected_patch_panels_wires(UnboundedPath),
@@ -228,12 +255,19 @@ find_patch_panel_wires(PatchpId) ->
           end,
     dby:search(Fun, not_found, PatchpId, [breadth, {max_depth, 0}]).
 
-is_id_physical_port(Id) ->
-    find_identifier_type(Id) =:= <<"lm_pp">>.
-
 find_identifier_type(Id) ->
     Fun = fun(_, #{<<"type">> := #{value := V}} , _, _) ->
                   {stop, V}
           end,
     dby:search(Fun, not_found, Id, [breadth, {max_depth, 0}]).
 
+
+split_identifier_into_prefix_and_rest(Identifier) ->
+    IdentifierS = binary_to_list(Identifier),
+    case string:tokens(IdentifierS, "/") of
+        IdentifierS ->
+            "";
+        Tokens0 ->
+            Tokens1 = lists:droplast(Tokens0),
+            {string:join(Tokens1, "/"), hd(lists:reverse(Tokens0))}
+    end.
