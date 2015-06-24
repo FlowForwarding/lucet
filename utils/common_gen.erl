@@ -1,6 +1,7 @@
 -module(common_gen).
 
 -define(TYPE(T), {<<"type">>, atom_to_binary(T, utf8)}).
+-define(MNESIA_DIR, "Mnesia.appfest_gen").
 
 -export([setup/0, publish/1, publish/2, publish/3, export_to_json/1,
          merge_patchp_wires_md/1]).
@@ -13,8 +14,8 @@
 %% API
 
 setup() ->
-    [os:cmd(io_lib:format("rm -rf ~p", [Dir]))
-     || Dir <- filelib:wildcard("utils/Mnesia*"), filelib:is_dir(Dir)],
+    application:set_env(mnesia, dir, ?MNESIA_DIR),
+    os:cmd(io_lib:format("rm -rf ~p", [?MNESIA_DIR])),
     code:add_pathsa(filelib:wildcard("deps/*/ebin")),
     {ok, _} = application:ensure_all_started(dobby),
     dby_mnesia:clear().
