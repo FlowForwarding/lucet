@@ -68,6 +68,7 @@ publish_ph_ports(PhId, Args) ->
 
 publish_lincx_vh(PhId, Args) ->
     VhId = publish_vh_id(PhId, _VhNo = 1),
+    publish_part_of_link(PhId, VhId),
     PatchpId = publish_patchp_id(VhId),
     {Ofps, Vps, Vifs} = publish_ofs(PhId, VhId, PatchpId, Args),
     set_wired_patchp(PatchpId, lists:zip(Ofps, Vps)),
@@ -94,6 +95,7 @@ publish_vms(PhId, Args) ->
          %% VH numbers for VMs start from 2
          VhNo = N + 1,
          VmId = publish_vm_id(PhId, VhNo),
+         publish_part_of_link(PhId, VmId),
          VpId = publish_vm_vp_with_ep(VmId, publish_patchp_id(VmId)),
          VifId = publish_vif_id(PhId, VhNo, _VifSuffix = 1),
          publish_bound_to_link(VifId, VpId),
