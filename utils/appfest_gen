@@ -59,7 +59,7 @@ publish_ph(PhId, Args) ->
 publish_ph_ports(PhId, Args) ->
     [begin
          PpId = publish_pp_id(PhId, N),
-         VpId = publish_vp_id(PhId, N),
+         VpId = publish_xenbr_vp_id(PhId, N),
          [publish_part_of_link(PpId, Id) || Id <- [PhId, VpId]],
          PpId
      end || N <- lists:seq(1, arg(physical_ports, Args))].
@@ -68,6 +68,7 @@ publish_ph_ports(PhId, Args) ->
 
 publish_lincx_vh(PhId, Args) ->
     VhId = publish_vh_id(PhId, _VhNo = 1),
+    publish_part_of_link(PhId, VhId),
     PatchpId = publish_patchp_id(VhId),
     {Ofps, Vps, Vifs} = publish_ofs(PhId, VhId, PatchpId, Args),
     set_wired_patchp(PatchpId, lists:zip(Ofps, Vps)),
@@ -94,7 +95,9 @@ publish_vms(PhId, Args) ->
          %% VH numbers for VMs start from 2
          VhNo = N + 1,
          VmId = publish_vm_id(PhId, VhNo),
+         publish_part_of_link(PhId, VmId),
          VpId = publish_vm_vp_with_ep(VmId, publish_patchp_id(VmId)),
+         publish_part_of_link(VmId, VpId),
          VifId = publish_vif_id(PhId, VhNo, _VifSuffix = 1),
          publish_bound_to_link(VifId, VpId),
          VifId
@@ -133,6 +136,10 @@ publish_pp_id(Prefix, N) ->
 
 publish_vp_id(Prefix, N) ->
     VpId = id(Prefix, "VP~p", [N]),
+    publish_id(common_gen:id_lm_vp(VpId)).
+
+publish_xenbr_vp_id(Prefix, N) ->
+    VpId = id(Prefix, "xenbr~p", [N]),
     publish_id(common_gen:id_lm_vp(VpId)).
 
 publish_vh_id(Prefix, N) ->
