@@ -97,6 +97,7 @@ publish_vms(PhId, Args) ->
          VmId = publish_vm_id(PhId, VhNo),
          publish_part_of_link(PhId, VmId),
          VpId = publish_vm_vp_with_ep(VmId, publish_patchp_id(VmId)),
+         publish_part_of_link(VmId, VpId),
          VifId = publish_vif_id(PhId, VhNo, _VifSuffix = 1),
          publish_bound_to_link(VifId, VpId),
          VifId
