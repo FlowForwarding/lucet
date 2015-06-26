@@ -68,7 +68,6 @@ wire2(SrcId, DstId) ->
         {start_node_not_found, _} = Error ->
             {error, Error};
         Path when is_list(Path) ->
-            %% Path = find_path_to_bound(SrcId, DstId),
             Bindings = bind_ports_on_patch_panel(Path),
             create_connected_to_link(SrcId, DstId),
             link_xenbrs(Bindings)
@@ -261,13 +260,10 @@ find_path_to_bound(SrcId, DstId) ->
 	{start_node_not_found, _} = Error ->
 	    Error;
 	Path when is_list(Path) ->
-	    filter_patch_panels_on_path(Path, [])
-            %% TODO: add case for empy list and return empty path error
+            Path
     end.
 
 %% @doc Finds a path to bound that ends on `DstId'.
-%%
-%% TODO: Check wires MD
 find_path_to_bound_dby_fun(DstId) ->
     fun(_, #{<<"type">> := #{value := Type}}, _, Acc) when
               Type =:= <<"lm_ph">> orelse
@@ -278,29 +274,20 @@ find_path_to_bound_dby_fun(DstId) ->
             %% The first node (path is empty).
             %% Forget {start_node_not_found, SrcId}.
             {continue, []};
+       (_, ?TYPE(<<"lm_patchp">>) = Md, [{PortId, _, _} | _], Acc) ->
+            #{<<"wires">> := #{value := Wires}} = Md,
+            case is_port_attached_to_patchp_bounded(Wires, PortId) of
+                true ->
+                    %% if the port is bounded, follow 'bound_to' path
+                    {skip, Acc};
+                false ->
+                    {continue, Acc}
+            end;
        (Id, Md, Path, _) when Id =:= DstId ->
             {stop, lists:reverse([{Id, Md, #{}} | Path])};
        (_, _, _, Acc) ->
             {continue, Acc}
     end.
-
-%% @doc Filters patch panels between connected ports
-%% TODO: TO be removed
-filter_patch_panels_on_path([{P1Id, _, _} = PortA,
-                             {_Id, ?TYPE(<<"lm_patchp">>) = PatchPMd, _} = PatchP,
-                             {P2Id, _, _} = PortB | Rest], Acc) ->
-    #{<<"wires">> := #{value := WiresMap}} = PatchPMd,
-    case maps:get(P1Id, WiresMap) of
-        P2Id ->
-            %% The ports are connected; PatchP have to be removed from path
-            filter_patch_panels_on_path(Rest, [PortB, PortA | Acc]);
-        _ ->
-            filter_patch_panels_on_path(Rest, [PortB, PatchP, PortA | Acc])
-    end;
-filter_patch_panels_on_path([], Acc) ->
-    lists:reverse(Acc);
-filter_patch_panels_on_path([Other | Rest], Acc) ->
-    filter_patch_panels_on_path(Rest, [Other | Acc]).
 
 create_connected_to_link(SrcId, DstId) ->
     ok = dby:publish(<<"lucet">>, SrcId, DstId,
@@ -453,3 +440,6 @@ split_identifier_into_prefix_and_rest(Identifier) ->
             Tokens1 = lists:droplast(Tokens0),
             {string:join(Tokens1, "/"), hd(lists:reverse(Tokens0))}
     end.
+
+is_port_attached_to_patchp_bounded(Wires, PortId) ->
+    maps:is_key(PortId, Wires).
