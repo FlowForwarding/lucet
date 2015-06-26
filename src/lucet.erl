@@ -100,8 +100,15 @@ generate_lincx_domain_config(VirtualHost, MgmtIfMac) ->
 	      %% A patch panel.  Keep going.
 	      (_, #{<<"type">> := #{value := <<"lm_patchp">>}}, _, Acc) ->
 		   {continue, Acc};
-	      %% A physical port.  Keep going.
-	      (_, #{<<"type">> := #{value := <<"lm_pp">>}}, _, Acc) ->
+	      %% A physical port, linked from a patch panel, _not_
+	      %% from a VIF.  Keep going.
+	      %%
+	      %% We need to make sure we're coming from the patch
+	      %% panel, to be able to identify the patch panel to use
+	      %% once we reach the physical host.
+	      (_, #{<<"type">> := #{value := <<"lm_pp">>}},
+	       [{_, #{<<"type">> := #{value := <<"lm_patchp">>}}, #{<<"type">> := #{value := <<"part_of">>}}} | _],
+	       Acc) ->
 		   {continue, Acc};
 	      %% We've reached the physical host, and it has a
 	      %% physical port that is part of a patch panel.  This is
@@ -128,7 +135,7 @@ generate_lincx_domain_config(VirtualHost, MgmtIfMac) ->
 	     virtual_ports => []},
 	   VirtualHost,
 	   %% TODO: fix max_depth
-	   [breadth, {max_depth, 10}]) of
+	   [breadth, {max_depth, 10}, {loop, link}]) of
 
 	#{virtual_host_found := false} ->
 	    io:format(standard_error, "Virtual host '~s' not found~n", [VirtualHost]),
