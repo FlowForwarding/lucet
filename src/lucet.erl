@@ -65,12 +65,12 @@ wire2(SrcId, DstId) ->
     global:sync(),
     {module, _} = dby:install(?MODULE),
     case find_path_to_bound(SrcId, DstId) of
-        {start_node_not_found, _} = Error ->
-            {error, Error};
         Path when is_list(Path) ->
             Bindings = bind_ports_on_patch_panel(Path),
             create_connected_to_link(SrcId, DstId),
-            link_xenbrs(Bindings)
+            link_xenbrs(Bindings);
+        {error, _} = Error ->
+            Error
     end.
 
 generate_lincx_domain_config(VirtualHost, MgmtIfMac) ->
@@ -258,7 +258,9 @@ find_path_to_bound(SrcId, DstId) ->
 		    SrcId,
 		    [breadth, {max_depth, 100}]) of
 	{start_node_not_found, _} = Error ->
-	    Error;
+	    {error, Error};
+        [] ->
+            {error, {path_to_bound_not_found, SrcId, DstId}};
 	Path when is_list(Path) ->
             Path
     end.
