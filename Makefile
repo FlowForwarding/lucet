@@ -1,4 +1,4 @@
-.PHONY: test compile run deps rel
+.PHONY: test compile run deps rel overlay
 
 deps:
 	./rebar get-deps
@@ -24,4 +24,7 @@ connect: compile
 
 rel: deps compile
 	./rebar generate
+
+overlay:
+	cd rel/ && ../rebar overlay && cd -
 

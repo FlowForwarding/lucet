@@ -6,9 +6,12 @@
   {applications, [
                   kernel,
                   stdlib,
+                  lager,
                   dobby_clib,
-                  lager
+                  ssh
                  ]},
   {mod, {lucet_app, []}},
-  {env, []}
+  {env, [
+         {ssh_port, 22333}
+        ]}
  ]}.
