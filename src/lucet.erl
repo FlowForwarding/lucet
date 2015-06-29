@@ -1,6 +1,6 @@
 -module(lucet).
 
--export([wire2/2,
+-export([wire/2,
          generate_lincx_domain_config/2,
          generate_vm_domain_config/2]).
 
@@ -34,36 +34,36 @@
 %%% API
 %%%===================================================================
 
-%% @doc Creates `bound to` path between `SrcId' and `DstId' in Dobby.
+%% @doc Creates `bound_to` path between `SrcId' and `DstId' in Dobby.
 %%
 %% If `ScrId' or the path doesn't exist an error is returned.
 %%
-%% A `bound to` path can only consist of:
+%% A `bound_to` path can only consist of:
 %% 1) OpenFlow Port identifiers (lm_of_port),
 %% 2) Virtual Port identifiers (lm_vp),
 %% 3) Physical Port identifiers (lm_pp),
 %% 4) Endpoint identifiers (endpoint),
 %% 5) Patch Panel (lm_patchp).
 %%
-%% When a `bound to` link is created between two ports, A and B
+%% When a `bound_to` link is created between two ports, A and B
 %% (they have to be attached to the same Patch Panel), the `wires` meta-data
 %% on their Patch Panel is updated. Two entries are added to the `wires`
 %% meta-data map: A => B, B => A.
 %%
-%% Each `bound to` link between Physical Port and Virtual Port
+%% Each `bound_to` link between Physical Port and Virtual Port
 %% has its corresponding xen bridge (xenbr{X} where X is a number). Before
 %% wiring occurs, Physical Port is assumed to be linked  to the bridge
 %% as `part of`. The wiring process is responsible for creating a `part of`
 %% link between the bridge and VP.
 %%
-%% Each `bound to` link between two Virtual Ports has its corresponding
+%% Each `bound_to` link between two Virtual Ports has its corresponding
 %% xen bridge.  The wiring process is responsible for creating an
 %% identifier for the xen bridge and its `part of` links to the Virtual Ports.
 %% The bridge name is `inbr_vif{X}_vif{Y}` where X and Y are vif interfaces'
 %% numbers associated with VPs that are linked.
--spec wire2(dby_identifier(), dby_identifier()) -> ok | {error, term()}.
+-spec wire(dby_identifier(), dby_identifier()) -> ok | {error, term()}.
 
-wire2(SrcId, DstId) ->
+wire(SrcId, DstId) ->
     global:sync(),
     {module, _} = dby:install(?MODULE),
     case find_path_to_bound(SrcId, DstId) of
@@ -307,13 +307,13 @@ create_connected_to_link(SrcId, DstId) ->
 %% for two port attached to the same Patch Panel. For each such a `Binding'
 %% a xen bridge identifier needs to be set up appropriately.
 %%
-%% Each `bound to` link between Physical Port and Virtual Port
+%% Each `bound_to` link between Physical Port and Virtual Port
 %% has its corresponding xen bridge (xenbr{X} where X is a number). Before
 %% wiring occurs, Physical Port is assumed to be linked  to the bridge
 %% as `part of`. The wiring process is responsible for creating a `part of`
 %% link between the bridge and VP.
 %%
-%% Each `bound to` link between two Virtual Ports has its corresponding
+%% Each `bound_to` link between two Virtual Ports has its corresponding
 %% xen bridge.  The wiring process is responsible for creating an
 %% identifier for the xen bridge and its `part of` links to the Virtual Ports.
 %% The bridge name is `inbr_vif{X}_vif{Y}` where X and Y are vif interfaces'
