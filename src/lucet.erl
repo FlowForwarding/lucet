@@ -30,7 +30,9 @@
 -include_lib("dobby_clib/include/dobby.hrl").
 
 
-%% API
+%%%===================================================================
+%%% API
+%%%===================================================================
 
 %% @doc Creates `bound to` path between `SrcId' and `DstId' in Dobby.
 %%
@@ -215,7 +217,9 @@ get_bound_to_path(Src, Dst) ->
           end,
     dby:search(Fun, not_found, Src, [breadth, {max_depth, 100}]).
 
-%% Internal functions
+%%%===================================================================
+%%% Internal functions
+%%%===================================================================
 
 mac_string_to_number(MacS) ->
     HexBytes = string:tokens(MacS, ":"),
