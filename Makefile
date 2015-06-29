@@ -1,4 +1,4 @@
-.PHONY: test compile run deps
+.PHONY: test compile run deps rel
 
 deps:
 	./rebar get-deps
@@ -21,3 +21,7 @@ connect: compile
 	    -setcookie dobby \
 	    -eval "pong =:= net_adm:ping('dobby@127.0.0.1') orelse begin io:format(standard_error, \"\nCannot connect to Dobby node; exiting\n\", []), halt(1) end" \
 	    -eval "{ok, _} = application:ensure_all_started(lucet)"
+
+rel: deps compile
+	./rebar generate
+

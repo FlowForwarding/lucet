@@ -5,7 +5,7 @@ deps
 *.plt
 erl_crash.dump
 ebin
-rel/example_project
+rel/lucet
 .concrete/DEV_MODE
 .rebar
 Mnesia*

@@ -9,5 +9,6 @@
                   dobby_clib,
                   lager
                  ]},
+  {mod, {lucet_app, []}},
   {env, []}
  ]}.
