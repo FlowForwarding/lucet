@@ -35,6 +35,10 @@
 -define(TYPE(V), #{<<"type">> := #{value := V}}).
 -define(LINK_TYPE(V), [{_, _, ?TYPE(V)}]).
 
+%%%===================================================================
+%%% Generators
+%%%===================================================================
+
 %% Tests based on the topology shown in the figure 17A in the Lucet Desgin
 %% document:
 %% https://docs.google.com/document/d/1Gtoi8IX1EN3oWDRPTFa_VltOdJAwRbl_ChAZWk8oKIk/edit#
@@ -55,7 +59,9 @@ ld_fig17a_test_() ->
        fun it_binds_already_bounded_path_between_ofps/0}
      ]}.
 
-%% Tests
+%%%===================================================================
+%%% Tests
+%%%===================================================================
 
 it_finds_path_between_ep_and_ofp() ->
     %% GIVEN
@@ -131,7 +137,9 @@ it_binds_already_bounded_path_between_ofps() ->
     ?assertEqual(ok, lucet:wire2(Src, Dst)),
     assert_path_bounded(Src, Dst, ?PH1_OFS1_OFP1_TO_PH2_OFS1_OFP1).
 
-%% Assertions
+%%%===================================================================
+%%% Assertins
+%%%===================================================================
 
 assert_src_connected_to_dst(Src, Dst) ->
     Links = dby:links(Src),
@@ -219,7 +227,9 @@ assert_patch_panels_wired(UnboundedPath) ->
                           ?assertEqual(PortA, maps:get(PortB, ActualWires))
                   end, PatchPanelsWires).
 
-%% Internal functions
+%%%===================================================================
+%%% Internal functions
+%%%===================================================================
 
 setup_dobby() ->
     application:stop(dobby),

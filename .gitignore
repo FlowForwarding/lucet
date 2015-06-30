@@ -5,8 +5,11 @@ deps
 *.plt
 erl_crash.dump
 ebin
-rel/example_project
-.concrete/DEV_MODE
+rel/lucet
 .rebar
 Mnesia*
 utils/Mnesia*
+priv/user_dir/*
+priv/system_dir/*
+!priv/user_dir/README.md
+!priv/system_dir/README.md
