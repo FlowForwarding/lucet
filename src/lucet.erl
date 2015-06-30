@@ -451,4 +451,6 @@ split_identifier_into_prefix_and_rest(Identifier) ->
     end.
 
 is_port_attached_to_patchp_bounded(Wires, PortId) ->
-    maps:is_key(PortId, Wires).
+    %% A port is considered bound if it is present in the wires map
+    %% and not <<"null">>.
+    maps:get(PortId, Wires, <<"null">>) =/= <<"null">>.
