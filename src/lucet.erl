@@ -159,18 +159,79 @@ generate_lincx_domain_config(VirtualHost, MgmtIfMac) ->
 		  fun(_Port1, <<"null">>, Acc) ->
 			  Acc;
 		     (Port1, Port2, Acc) ->
-			  case re:run(Port1, <<"^", PhysicalHost/binary, "/PP([0-9]+)$">>, [{capture, all_but_first, list}]) of
-			      {match, [IfNo]} ->
-				  MacNo = MgmtIfMacNo + list_to_integer(IfNo),
-				  [{mac_number_to_string(MacNo), "xenbr" ++ IfNo}] ++ Acc;
-			      nomatch ->
-				  %% Not starting from a physical port
+			  %% Find a virtual port that both Port1 and Port2 are part_of.
+			  case dby:search(
+				 fun(_, _, [], _Acc) ->
+					 {continue, []};
+				    (Id, #{<<"type">> := #{value := <<"lm_vp">>}},
+				     [{LinkedFrom, _, #{<<"type">> := #{value := <<"part_of">>}}}],
+				     MaybeBridges) when LinkedFrom =:= Port1 ->
+					 %% This is a virtual port that is
+					 %% part_of Port1.  Save it as a
+					 %% candidate.
+					 {continue, [Id | MaybeBridges]};
+				    (Id, #{},
+				     [{LinkedFrom, _, #{<<"type">> := #{value := <<"bound_to">>}}}],
+				     MaybeBridges) when LinkedFrom =:= Port1, Id =:= Port2 ->
+					 %% We found Port2 directly from Port1.  Keep going.
+					 {continue, MaybeBridges};
+				    (Id, #{<<"type">> := #{value := <<"lm_vp">>}},
+				     [{LinkedFromPort2, _, #{<<"type">> := #{value := <<"part_of">>}}},
+				      {LinkedFromPort1, _, #{<<"type">> := #{value := <<"bound_to">>}}}],
+				     MaybeBridges) when LinkedFromPort2 =:= Port2, LinkedFromPort1 =:= Port1 ->
+					 %% This is a virtual port that is
+					 %% part_of Port2.
+					 case lists:member(Id, MaybeBridges) of
+					     true ->
+						 %% It's also part_of Port1.
+						 %% This is the one we want.
+						 {stop, {found, Id}};
+					     false ->
+						 %% Keep looking.
+						 {continue, MaybeBridges}
+					 end;
+				    (Id, #{},
+				     [{LinkedFromBridge, _, #{<<"type">> := #{value := <<"part_of">>}}},
+				      {LinkedFromPort1, _, #{<<"type">> := #{value := <<"part_of">>}}}],
+				     MaybeBridges) when Id =:= Port2, LinkedFromPort1 =:= Port1 ->
+					 %% We found Port2 through a
+					 %% virtual port that might be
+					 %% part_of Port1.
+					 case lists:member(LinkedFromBridge, MaybeBridges) of
+					     true ->
+						 {stop, {found, LinkedFromBridge}};
+					     false ->
+						 {skip, MaybeBridges}
+					 end;
+				    (_, _, _, MaybeBridges) ->
+					 %% Skip everything else.
+					 {skip, MaybeBridges}
+				 end,
+				 not_found,
+				 Port1,
+				 [breadth, {max_depth, 3}, {loop, link}]) of
+			      not_found ->
+				  io:format(standard_error, "Cannot find port ~s in Dobby~n", [Port1]),
+				  Acc;
+			      {found, BridgeId} ->
+				  %% TODO: find MAC address
+				  [{undefined, binary_to_list(BridgeId)}] ++ Acc;
+			      [] ->
+				  io:format(standard_error, "No bridge interface linked to ~s~n", [Port1]),
+				  Acc;
+			      [_|_] = MaybeBridges ->
+				  io:format(standard_error, "No bridge interface linked to both ~s and ~s (looked at ~p)~n",
+					    [Port1, Port2, MaybeBridges]),
 				  Acc
 			  end
 		  end, [], Wires),
-	    VifList = [FirstVif] ++ lists:sort(OtherVifs),
+	    VifList = [FirstVif] ++ lists:usort(OtherVifs),
 	    VifString = "vif = [" ++
-		string:join(["'mac=" ++ Mac ++ ",bridge=" ++ If ++ "'" || {Mac, If} <- VifList],
+		string:join(["'" ++ case Mac of
+					undefined -> "";
+					_ -> "mac=" ++ Mac ++ ","
+				    end ++
+				 "bridge=" ++ If ++ "'" || {Mac, If} <- VifList],
 			    ",\n       ") ++
 		"]\n",
 	    io:format("~s~n", [VifString]),
