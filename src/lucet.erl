@@ -154,7 +154,7 @@ generate_lincx_domain_config(VirtualHost, MgmtIfMac) ->
 	  physical_host_id := PhysicalHost} ->
 	    %% TODO: match up virtual ports to bridge interfaces.
 	    %% Probably need to extract from Dobby.
-	    FirstVif = {MgmtIfMac, "xenbr0"},
+	    FirstVif = {MgmtIfMac, <<"xenbr0">>},
 	    MgmtIfMacNo = mac_string_to_number(MgmtIfMac),
 	    OtherVifs =
 		maps:fold(
@@ -217,7 +217,7 @@ generate_lincx_domain_config(VirtualHost, MgmtIfMac) ->
 				  Acc;
 			      {found, BridgeId} ->
 				  %% TODO: find MAC address
-				  [{undefined, binary_to_list(BridgeId)}] ++ Acc;
+				  [{undefined, BridgeId}] ++ Acc;
 			      [] ->
 				  io:format(standard_error, "No bridge interface linked to ~s~n", [Port1]),
 				  Acc;
@@ -229,11 +229,14 @@ generate_lincx_domain_config(VirtualHost, MgmtIfMac) ->
 		  end, [], Wires),
 	    VifList = [FirstVif] ++ lists:usort(OtherVifs),
 	    VifString = "vif = [" ++
-		string:join(["'" ++ case Mac of
-					undefined -> "";
-					_ -> "mac=" ++ Mac ++ ","
-				    end ++
-				 "bridge=" ++ If ++ "'" || {Mac, If} <- VifList],
+		string:join([begin
+				 {_Ph, If} = split_identifier_into_prefix_and_rest(PhIf),
+				 "'" ++ case Mac of
+					    undefined -> "";
+					    _ -> "mac=" ++ Mac ++ ","
+					end ++
+				     "bridge=" ++ If ++ "'"
+			     end || {Mac, PhIf} <- VifList],
 			    ",\n       ") ++
 		"]\n",
 	    io:format("~s~n", [VifString]),
