@@ -75,6 +75,8 @@ wire(SrcId, DstId) ->
             Error
     end.
 
+generate_lincx_domain_config(VirtualHost, MgmtIfMac) when is_list(VirtualHost) ->
+    generate_lincx_domain_config(list_to_binary(VirtualHost), MgmtIfMac);
 generate_lincx_domain_config(VirtualHost, MgmtIfMac) ->
     global:sync(),
     {module, _} = dby:install(?MODULE),
