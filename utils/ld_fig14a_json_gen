@@ -30,7 +30,7 @@ endpoints_with_ph1(NPorts) ->
     common_gen:publish(common_gen:id_lm_patchp(LmPatchP = <<"PH1/PatchP">>,
                                                #{})),
     PhysicalPorts = [begin
-                         LmVp = list_to_binary(io_lib:format("PH1/VP~p",[N])),
+                         LmVp = list_to_binary(io_lib:format("PH1/xenbr~p",[N])),
                          LmPp = list_to_binary(io_lib:format("PH1/PP~p",[N])),
                          Ep = list_to_binary(io_lib:format("Pi~p",[N])),
                          common_gen:publish(common_gen:id_lm_vp(LmVp),

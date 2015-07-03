@@ -7,12 +7,12 @@
           
         },
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       },
       "type" : {
         "value" : "lm_patchp",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -25,7 +25,7 @@
       "type" : {
         "value" : "part_of",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -38,7 +38,7 @@
       "type" : {
         "value" : "part_of",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -51,7 +51,7 @@
       "type" : {
         "value" : "part_of",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -64,30 +64,7 @@
       "type" : {
         "value" : "part_of",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
-      }
-    }
-  },
-  {
-    "identifier" : "PH1/VP1",
-    "metadata" : {
-      "type" : {
-        "value" : "lm_vp",
-        "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
-      }
-    }
-  },
-  {
-    "link" : [
-      "PH1/VP1",
-      "PH1/PP1"
-    ],
-    "metadata" : {
-      "type" : {
-        "value" : "part_of",
-        "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -97,7 +74,7 @@
       "type" : {
         "value" : "lm_vp",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -110,7 +87,7 @@
       "type" : {
         "value" : "bound_to",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -123,7 +100,7 @@
       "type" : {
         "value" : "part_of",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -136,7 +113,7 @@
       "type" : {
         "value" : "bound_to",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -149,7 +126,7 @@
       "type" : {
         "value" : "part_of",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -159,7 +136,7 @@
       "type" : {
         "value" : "of_port",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -172,7 +149,7 @@
       "type" : {
         "value" : "bound_to",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -185,7 +162,7 @@
       "type" : {
         "value" : "part_of",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -198,7 +175,7 @@
       "type" : {
         "value" : "part_of",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -208,7 +185,7 @@
       "type" : {
         "value" : "endpoint",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -227,7 +204,7 @@
       "type" : {
         "value" : "lm_pp",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -243,13 +220,13 @@
   {
     "link" : [
       "PH1/PP1",
-      "PH1/VP1"
+      "PH1/xenbr1"
     ],
     "metadata" : {
       "type" : {
         "value" : "part_of",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -262,7 +239,7 @@
       "type" : {
         "value" : "part_of",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -275,7 +252,7 @@
       "type" : {
         "value" : "part_of",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -285,7 +262,7 @@
       "type" : {
         "value" : "lm_pp",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -301,13 +278,13 @@
   {
     "link" : [
       "PH1/PP2",
-      "PH1/VP2"
+      "PH1/xenbr2"
     ],
     "metadata" : {
       "type" : {
         "value" : "part_of",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -320,7 +297,7 @@
       "type" : {
         "value" : "part_of",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -333,7 +310,7 @@
       "type" : {
         "value" : "part_of",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -343,7 +320,7 @@
       "type" : {
         "value" : "of_switch",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -356,7 +333,7 @@
       "type" : {
         "value" : "part_of",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -369,7 +346,7 @@
       "type" : {
         "value" : "part_of",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -379,7 +356,7 @@
       "type" : {
         "value" : "lm_vp",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -392,7 +369,7 @@
       "type" : {
         "value" : "bound_to",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -405,7 +382,7 @@
       "type" : {
         "value" : "part_of",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -418,7 +395,7 @@
       "type" : {
         "value" : "bound_to",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -431,7 +408,30 @@
       "type" : {
         "value" : "part_of",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
+      }
+    }
+  },
+  {
+    "identifier" : "PH1/xenbr1",
+    "metadata" : {
+      "type" : {
+        "value" : "lm_vp",
+        "publisher_id" : "lucet",
+        "timestamp" : "2015-07-03T12:16:03Z"
+      }
+    }
+  },
+  {
+    "link" : [
+      "PH1/xenbr1",
+      "PH1/PP1"
+    ],
+    "metadata" : {
+      "type" : {
+        "value" : "part_of",
+        "publisher_id" : "lucet",
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -441,7 +441,7 @@
       "type" : {
         "value" : "lm_vp",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -454,7 +454,7 @@
       "type" : {
         "value" : "bound_to",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -467,7 +467,7 @@
       "type" : {
         "value" : "part_of",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -477,7 +477,7 @@
       "type" : {
         "value" : "lm_vh",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -490,7 +490,7 @@
       "type" : {
         "value" : "part_of",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -503,7 +503,7 @@
       "type" : {
         "value" : "part_of",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -518,12 +518,12 @@
           "PH1/PP1" : "null"
         },
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       },
       "type" : {
         "value" : "lm_patchp",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -536,7 +536,7 @@
       "type" : {
         "value" : "part_of",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -549,7 +549,7 @@
       "type" : {
         "value" : "part_of",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -562,7 +562,7 @@
       "type" : {
         "value" : "part_of",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -575,7 +575,7 @@
       "type" : {
         "value" : "part_of",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -585,7 +585,7 @@
       "type" : {
         "value" : "of_port",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -598,7 +598,7 @@
       "type" : {
         "value" : "bound_to",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -611,7 +611,7 @@
       "type" : {
         "value" : "part_of",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -624,7 +624,7 @@
       "type" : {
         "value" : "part_of",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -634,7 +634,7 @@
       "type" : {
         "value" : "lm_vp",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -647,7 +647,7 @@
       "type" : {
         "value" : "bound_to",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -660,7 +660,30 @@
       "type" : {
         "value" : "part_of",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
+      }
+    }
+  },
+  {
+    "identifier" : "PH1/xenbr2",
+    "metadata" : {
+      "type" : {
+        "value" : "lm_vp",
+        "publisher_id" : "lucet",
+        "timestamp" : "2015-07-03T12:16:03Z"
+      }
+    }
+  },
+  {
+    "link" : [
+      "PH1/xenbr2",
+      "PH1/PP2"
+    ],
+    "metadata" : {
+      "type" : {
+        "value" : "part_of",
+        "publisher_id" : "lucet",
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -670,7 +693,7 @@
       "type" : {
         "value" : "endpoint",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -684,35 +707,12 @@
     }
   },
   {
-    "identifier" : "PH1/VP2",
-    "metadata" : {
-      "type" : {
-        "value" : "lm_vp",
-        "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
-      }
-    }
-  },
-  {
-    "link" : [
-      "PH1/VP2",
-      "PH1/PP2"
-    ],
-    "metadata" : {
-      "type" : {
-        "value" : "part_of",
-        "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
-      }
-    }
-  },
-  {
     "identifier" : "PH1",
     "metadata" : {
       "type" : {
         "value" : "lm_ph",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -725,7 +725,7 @@
       "type" : {
         "value" : "part_of",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   },
@@ -738,7 +738,7 @@
       "type" : {
         "value" : "part_of",
         "publisher_id" : "lucet",
-        "timestamp" : "2015-05-06T15:17:00Z"
+        "timestamp" : "2015-07-03T12:16:03Z"
       }
     }
   }
