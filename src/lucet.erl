@@ -2,7 +2,7 @@
 
 -export([wire/2,
          generate_lincx_domain_config/2,
-         generate_vm_domain_config/2]).
+         generate_vh_domain_config/3]).
 
 %% Diagnostics functions
 -export([get_bound_to_path/2]).
@@ -148,85 +148,15 @@ generate_lincx_domain_config(VirtualHost, MgmtIfMac) ->
 	    io:format(standard_error, "Patch panel not found~n", []),
 	    {error, patch_panel_not_found};
 
-	#{patch_panel_id := PatchPanelId,
+	#{patch_panel_id := _PatchPanelId,
 	  wires := Wires,
 	  virtual_ports := VirtualPorts,
-	  physical_host_id := PhysicalHost} ->
+	  physical_host_id := _PhysicalHost} ->
 	    %% TODO: match up virtual ports to bridge interfaces.
 	    %% Probably need to extract from Dobby.
 	    FirstVif = {MgmtIfMac, <<"xenbr0">>},
 	    MgmtIfMacNo = mac_string_to_number(MgmtIfMac),
-	    OtherVifs =
-		maps:fold(
-		  fun(_Port1, <<"null">>, Acc) ->
-			  Acc;
-		     (Port1, Port2, Acc) ->
-			  %% Find a virtual port that both Port1 and Port2 are part_of.
-			  case dby:search(
-				 fun(_, _, [], _Acc) ->
-					 {continue, []};
-				    (Id, #{<<"type">> := #{value := <<"lm_vp">>}},
-				     [{LinkedFrom, _, #{<<"type">> := #{value := <<"part_of">>}}}],
-				     MaybeBridges) when LinkedFrom =:= Port1 ->
-					 %% This is a virtual port that is
-					 %% part_of Port1.  Save it as a
-					 %% candidate.
-					 {continue, [Id | MaybeBridges]};
-				    (Id, #{},
-				     [{LinkedFrom, _, #{<<"type">> := #{value := <<"bound_to">>}}}],
-				     MaybeBridges) when LinkedFrom =:= Port1, Id =:= Port2 ->
-					 %% We found Port2 directly from Port1.  Keep going.
-					 {continue, MaybeBridges};
-				    (Id, #{<<"type">> := #{value := <<"lm_vp">>}},
-				     [{LinkedFromPort2, _, #{<<"type">> := #{value := <<"part_of">>}}},
-				      {LinkedFromPort1, _, #{<<"type">> := #{value := <<"bound_to">>}}}],
-				     MaybeBridges) when LinkedFromPort2 =:= Port2, LinkedFromPort1 =:= Port1 ->
-					 %% This is a virtual port that is
-					 %% part_of Port2.
-					 case lists:member(Id, MaybeBridges) of
-					     true ->
-						 %% It's also part_of Port1.
-						 %% This is the one we want.
-						 {stop, {found, Id}};
-					     false ->
-						 %% Keep looking.
-						 {continue, MaybeBridges}
-					 end;
-				    (Id, #{},
-				     [{LinkedFromBridge, _, #{<<"type">> := #{value := <<"part_of">>}}},
-				      {LinkedFromPort1, _, #{<<"type">> := #{value := <<"part_of">>}}}],
-				     MaybeBridges) when Id =:= Port2, LinkedFromPort1 =:= Port1 ->
-					 %% We found Port2 through a
-					 %% virtual port that might be
-					 %% part_of Port1.
-					 case lists:member(LinkedFromBridge, MaybeBridges) of
-					     true ->
-						 {stop, {found, LinkedFromBridge}};
-					     false ->
-						 {skip, MaybeBridges}
-					 end;
-				    (_, _, _, MaybeBridges) ->
-					 %% Skip everything else.
-					 {skip, MaybeBridges}
-				 end,
-				 not_found,
-				 Port1,
-				 [breadth, {max_depth, 3}, {loop, link}]) of
-			      not_found ->
-				  io:format(standard_error, "Cannot find port ~s in Dobby~n", [Port1]),
-				  Acc;
-			      {found, BridgeId} ->
-				  %% TODO: find MAC address
-				  [{undefined, BridgeId}] ++ Acc;
-			      [] ->
-				  io:format(standard_error, "No bridge interface linked to ~s~n", [Port1]),
-				  Acc;
-			      [_|_] = MaybeBridges ->
-				  io:format(standard_error, "No bridge interface linked to both ~s and ~s (looked at ~p)~n",
-					    [Port1, Port2, MaybeBridges]),
-				  Acc
-			  end
-		  end, [], Wires),
+	    OtherVifs = find_xen_bridges_for_vh_vps(VirtualPorts, Wires),
 	    VifList = [FirstVif] ++ lists:usort(OtherVifs),
 	    VifString = "vif = [" ++
 		string:join([begin
@@ -243,35 +173,19 @@ generate_lincx_domain_config(VirtualHost, MgmtIfMac) ->
 	    ok
     end.
 
-generate_vm_domain_config(PhysicalHost, VmNo) ->
+%% @doc TODO
+generate_vh_domain_config(PhysicalHost, VhNo, MgmtMac) ->
     global:sync(),
     {module, _} = dby:install(?MODULE),
-    VmVif = string:join([PhysicalHost, "VP" ++ integer_to_list(VmNo) ++ ".1"],
-                        "/"),
-    case dby:search(
-           fun(_, _, [], Acc) ->
-                   {continue, Acc};
-              (Id,
-               #{<<"type">> := #{value := <<"lm_vp">>}},
-               [{_, _, #{<<"type">> := #{value := <<"part_of">>}}}],
-               _Acc) ->
-                   {stop, {found, Id}};
-              (_, _, _, Acc) ->
-                   {skip, Acc}
-           end,
-           not_found,
-           list_to_binary(VmVif),
-           [{max_depth, 2}]) of
-        {found, InxenbrId} ->
-            VifString = "vif = ['bridge="
-                ++ "xenbr" ++ integer_to_list(100 + VmNo) ++ "'" ++
-                "]\n",
-            io:format("~s~n", [VifString]);
-        not_found ->
-            io:format(standard_error, "Bridge for VM vif ~s not found in dobby!~n",
-                      [VmVif]),
-            {error, not_found}
-    end.
+    Vifs = collect_vifs_identifiers_for_vh_no(binary_to_list(PhysicalHost), VhNo),
+    Xenbrs = try
+                 collect_xenbrs_with_macs_for_vifs(Vifs)
+             catch
+                 throw:Error ->
+                     {error, Error}
+             end,
+    io:format("~s~n", [generate_vif_string(MgmtMac, Xenbrs)]).
+
 
 get_bound_to_path(Src, Dst) ->
     Fun = fun(Id, _, _, Acc) when Id =:= Src ->
@@ -433,12 +347,6 @@ publish_inbr_for_ph(P1Id, P2Id) ->
                      [persistent]),
     InbrId1.
 
-find_patchp_ph(PatchpId) ->
-    PatchpIdS = binary_to_list(PatchpId),
-    Tokens0 = string:tokens(PatchpIdS, "/"),
-    Tokens1 = lists:droplast(Tokens0),
-    list_to_binary(string:join(Tokens1, "/")).
-
 find_xenbr_vp_for_physical_port(Port) ->
     Fun = fun(XenbrVpId, ?TYPE(<<"lm_vp">>),
               [{_, _, ?TYPE(<<"part_of">>)}], _) ->
@@ -520,7 +428,130 @@ split_identifier_into_prefix_and_rest(Identifier) ->
             {string:join(Tokens1, "/"), hd(lists:reverse(Tokens0))}
     end.
 
+collect_vifs_identifiers_for_vh_no(PhysicalHost, VhNo) ->
+    VifPrefix = PhysicalHost ++ "/VP" ++ integer_to_list(VhNo) ++ ".",
+    collect_vifs_identifiers_for_vh_no(VifPrefix, _FirstVifNo = 1, []).
+
+collect_vifs_identifiers_for_vh_no(_, stop, Acc) ->
+    Acc;
+collect_vifs_identifiers_for_vh_no(VifPrefix, VifNo, Acc) ->
+    Identifier = list_to_binary(VifPrefix ++ integer_to_list(VifNo)),
+    case dby:identifier(Identifier) of
+        [] ->
+            collect_vifs_identifiers_for_vh_no(VifPrefix, stop, Acc);
+        #{} = _Found ->
+            collect_vifs_identifiers_for_vh_no(VifPrefix, VifNo + 1,
+                                               [Identifier | Acc])
+    end.
+
+collect_xenbrs_with_macs_for_vifs(Vifs) ->
+    Fun = fun(_, _, [], Acc) ->
+                  {continue, Acc};
+             (Id,
+              #{<<"type">> := #{value := <<"lm_vp">>}},
+              [{_, _, #{<<"type">> := #{value := <<"part_of">>}}}],
+              _Acc) ->
+                  {stop, {found, Id}};
+             (_, _, _, Acc) ->
+                  {skip, Acc}
+          end,
+    [case dby:search(Fun, not_found, Vif, [{max_depth, 2}]) of
+         {found, XenbrId} ->
+             {_, XenbrName} = split_identifier_into_prefix_and_rest(XenbrId),
+             {_Mac = undefined, XenbrName};
+         not_found ->
+             throw({xenbr_for_vif_not_found, Vif})
+     end || Vif <- Vifs].
+
+generate_vif_string(MgmtIfMac, Xenbrs) ->
+    FirstVif = {MgmtIfMac, "xenbr0"},
+    "vif = [" ++
+        string:join([begin
+                         "'" ++ case Mac of
+                                    undefined -> "";
+                                    _ -> "mac=" ++ Mac ++ ","
+                                end ++
+                             "bridge=" ++ Xenbr ++ "'"
+                     end || {Mac, Xenbr} <- [FirstVif | Xenbrs]],
+                    ",\n       ") ++
+        "]\n".
+
 is_port_attached_to_patchp_bounded(Wires, PortId) ->
     %% A port is considered bound if it is present in the wires map
     %% and not <<"null">>.
     maps:get(PortId, Wires, <<"null">>) =/= <<"null">>.
+
+
+find_xen_bridges_for_vh_vps(VhVirtalPorts, Wires) ->
+    lists:foldl(
+      fun({Port1, Port2}, Acc) ->
+              case find_vp_linked_to_ports_as_part_of(Port1, Port2) of
+                  not_found ->
+                      io:format(standard_error, "Cannot find port ~s in Dobby~n", [Port1]),
+                      Acc;
+                  {found, BridgeId} ->
+                      %% TODO: find MAC address
+                      [{undefined, BridgeId}] ++ Acc;
+                  [] ->
+                      io:format(standard_error, "No bridge interface linked to ~s~n", [Port1]),
+                      Acc;
+                  [_|_] = MaybeBridges ->
+                      io:format(standard_error, "No bridge interface linked to both ~s and ~s (looked at ~p)~n",
+                                [Port1, Port2, MaybeBridges]),
+                      Acc
+              end
+      end, [], [{VP, maps:get(VP, Wires)}
+                || VP <- VhVirtalPorts, maps:get(VP, Wires, <<"null">>) =/= <<"null">>]).
+
+find_vp_linked_to_ports_as_part_of(Port1, Port2) ->
+    Fun = fun(_, _, [], _Acc) ->
+                  {continue, []};
+             (Id, #{<<"type">> := #{value := <<"lm_vp">>}},
+              [{LinkedFrom, _, #{<<"type">> := #{value := <<"part_of">>}}}],
+              MaybeBridges) when LinkedFrom =:= Port1 ->
+                  %% This is a virtual port that is
+                  %% part_of Port1.  Save it as a
+                  %% candidate.
+                  {continue, [Id | MaybeBridges]};
+             (Id, #{},
+              [{LinkedFrom, _, #{<<"type">> := #{value := <<"bound_to">>}}}],
+              MaybeBridges) when LinkedFrom =:= Port1, Id =:= Port2 ->
+                  %% We found Port2 directly from Port1.  Keep going.
+                  {continue, MaybeBridges};
+             (Id, #{<<"type">> := #{value := <<"lm_vp">>}},
+              [{LinkedFromPort2, _, #{<<"type">> := #{value := <<"part_of">>}}},
+               {LinkedFromPort1, _, #{<<"type">> := #{value := <<"bound_to">>}}}],
+              MaybeBridges) when LinkedFromPort2 =:= Port2, LinkedFromPort1 =:= Port1 ->
+                  %% This is a virtual port that is
+                  %% part_of Port2.
+                  case lists:member(Id, MaybeBridges) of
+                      true ->
+                          %% It's also part_of Port1.
+                          %% This is the one we want.
+                          {stop, {found, Id}};
+                      false ->
+                          %% Keep looking.
+                          {continue, MaybeBridges}
+                  end;
+             (Id, #{},
+              [{LinkedFromBridge, _, #{<<"type">> := #{value := <<"part_of">>}}},
+               {LinkedFromPort1, _, #{<<"type">> := #{value := <<"part_of">>}}}],
+              MaybeBridges) when Id =:= Port2, LinkedFromPort1 =:= Port1 ->
+                  %% We found Port2 through a
+                  %% virtual port that might be
+                  %% part_of Port1.
+                  case lists:member(LinkedFromBridge, MaybeBridges) of
+                      true ->
+                          {stop, {found, LinkedFromBridge}};
+                      false ->
+                          {skip, MaybeBridges}
+                  end;
+             (_, _, _, MaybeBridges) ->
+                  %% Skip everything else.
+                  {skip, MaybeBridges}
+          end,
+    dby:search(Fun, not_found, Port1, [breadth, {max_depth, 3}, {loop, link}]).
+
+
+
+

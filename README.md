@@ -21,6 +21,7 @@ levels:
     - [Importing the topology file into Dobby](#importing-the-topology-file-into-dobby)
     - [Wiring OpenFlow ports](#wiring-openflow-ports)
     - [Wiring Endpoints with OpenFlow ports](#wiring-endpoints-with-openflow-ports)
+    - [Generating Xen config files for the VHs](#generating-xen-config-files-for-the-vhs)
 
 <!-- markdown-toc end -->
 
@@ -82,12 +83,22 @@ numbers associated with VPs that are linked.
 lucet:generate_lincx_domain_config(VirtalHost, MgmtIfMac)
 ```
 
-Generates domain config file for LINCX Virtual Host. This function
-is intended to be called after wiring is done by `lucet:wire/2`.
+Generates domain config file for Virtual Hosts (not necessarily those
+with LINCX). This function is intended to be called after wiring is done
+by `lucet:wire/2`.
 
-The `VirtualHost` is a string for VH identifier name and the `MgmtIfMac`
-is the MAC address of the Management interface.
+The `VirtualHost` is a name for VH identifier as string or binary
+(or list of names). The `MgmtIfMac` is the MAC address of the Management
+Interface that will be set for the first bridge.
 
+Below is an example call:
+
+```erlang
+lucet:generate_vh_domain_config(<<"PH1">>, 1, "00:01:02:03:04:05").
+vif = ['mac=00:01:02:03:04:05,bridge=xenbr0',
+       'bridge=inbr_vif1.2_vif2.1',
+       'bridge=xenbr1']
+```
 
 # Generating topologies ##
 
@@ -220,3 +231,24 @@ And the links:
 1. A `bound_to` link between `PH1/VP1.2` and `PH1/VP2.1`.
 1. A `connected_to` link between `PH1/VH1/OFS1/OFP2` and `PH1/VH2/EP1`.
 1. 4 analogous links to the above but for `PH2`.
+
+## Generating Xen config files for the VHs
+
+For `PH1/VH1`:
+
+```erlang
+lucet:generate_vh_domain_config(<<"PH1">>, 1, "00:01:02:03:04:05").
+vif = ['mac=00:01:02:03:04:05,bridge=xenbr0',
+       'bridge=inbr_vif1.2_vif2.1',
+       'bridge=xenbr1']
+```
+
+For `PH1/VH2`:
+
+```erlang
+lucet:generate_vh_domain_config(<<"PH1">>, 2, "00:01:02:03:04:05").
+vif = ['mac=00:01:02:03:04:05,bridge=xenbr0',
+       'bridge=inbr_vif1.2_vif2.1']
+```
+
+And analogously for the `PH2` Virtual Hosts.
