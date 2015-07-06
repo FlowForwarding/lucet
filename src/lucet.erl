@@ -173,19 +173,36 @@ generate_lincx_domain_config(VirtualHost, MgmtIfMac) ->
 	    ok
     end.
 
-%% @doc TODO
+%% @doc Generate domain config file for Xen.
+%%
+%% The `PhysicalHost' is the Physical Host identifier with Virtual Hosts
+%% for which the config is to be generated. Then `VhNo' is the Virtual Host
+%% number.  The `MgmtIfMac' is the Mac address of the management interface
+%% attached to the VH.
+%%
+%% For example, to get the domain config file for "PH1/VH1" if the Management
+%% Interface for the VH has "00:00:00:00:AB:01" Mac address, one need to call:
+%% `generate_vh_domain_config(<<"PH1">>, 1, "00:00:00:00:AB:01")'.
+-spec generate_vh_domain_config(dby_identifier(), integer(), string()) ->
+                                       string() | {error, term()}.
+
 generate_vh_domain_config(PhysicalHost, VhNo, MgmtMac) ->
     global:sync(),
     {module, _} = dby:install(?MODULE),
-    Vifs = collect_vifs_identifiers_for_vh_no(binary_to_list(PhysicalHost), VhNo),
-    Xenbrs = try
-                 collect_xenbrs_with_macs_for_vifs(Vifs)
-             catch
-                 throw:Error ->
-                     {error, Error}
-             end,
-    io:format("~s~n", [generate_vif_string(MgmtMac, Xenbrs)]).
+    Vifs = collect_vifs_identifiers_for_vh_no(binary_to_list(PhysicalHost),
+                                              VhNo),
+    try
+        Xenbrs = collect_xenbrs_with_macs_for_vifs(Vifs),
+        VifString = generate_vif_string(MgmtMac, Xenbrs),
+        io:format("~s~n", [VifString]),
+        VifString
+    catch
+        throw:Error ->
+            {error, Error}
+    end.
 
+-spec get_bound_to_path(dby_identifier(), dby_identifier()) ->
+                               [dby_identifier()] | not_found.
 
 get_bound_to_path(Src, Dst) ->
     Fun = fun(Id, _, _, Acc) when Id =:= Src ->
@@ -428,6 +445,8 @@ split_identifier_into_prefix_and_rest(Identifier) ->
             {string:join(Tokens1, "/"), hd(lists:reverse(Tokens0))}
     end.
 
+%% @priv This function relies on the fact, that the Vif interfaces'
+%% identifiers are based on on pattern: {PH_IDENTIFIER}/VP{VH_NO}.{VIF_NO}.
 collect_vifs_identifiers_for_vh_no(PhysicalHost, VhNo) ->
     VifPrefix = PhysicalHost ++ "/VP" ++ integer_to_list(VhNo) ++ ".",
     collect_vifs_identifiers_for_vh_no(VifPrefix, _FirstVifNo = 1, []).
@@ -445,23 +464,31 @@ collect_vifs_identifiers_for_vh_no(VifPrefix, VifNo, Acc) ->
     end.
 
 collect_xenbrs_with_macs_for_vifs(Vifs) ->
-    Fun = fun(_, _, [], Acc) ->
-                  {continue, Acc};
-             (Id,
-              #{<<"type">> := #{value := <<"lm_vp">>}},
-              [{_, _, #{<<"type">> := #{value := <<"part_of">>}}}],
-              _Acc) ->
-                  {stop, {found, Id}};
-             (_, _, _, Acc) ->
-                  {skip, Acc}
-          end,
-    [case dby:search(Fun, not_found, Vif, [{max_depth, 2}]) of
+    [case dby:search(mk_find_xenbr_for_bound_ports(Vif), not_found, Vif,
+                     [{max_depth, 2}]) of
          {found, XenbrId} ->
              {_, XenbrName} = split_identifier_into_prefix_and_rest(XenbrId),
              {_Mac = undefined, XenbrName};
          not_found ->
              throw({xenbr_for_vif_not_found, Vif})
      end || Vif <- Vifs].
+
+%% @priv This function finds Virtual Port identifier corresponding to
+%% a Xen bridge that connects two bound ports.
+%$
+%% It relies on the fact that two bound ports are 'part_of' the Xen bridge
+%% identifier, and those bound ports are directly connected to each other.
+mk_find_xenbr_for_bound_ports(VpId) ->
+    fun(Id, _, [], Acc) when Id =:= VpId ->
+            {continue, Acc};
+       (Id,
+        #{<<"type">> := #{value := <<"lm_vp">>}},
+        [{_, _, #{<<"type">> := #{value := <<"part_of">>}}}],
+        _Acc) ->
+            {stop, {found, Id}};
+       (_, _, _, Acc) ->
+            {skip, Acc}
+    end.
 
 generate_vif_string(MgmtIfMac, Xenbrs) ->
     FirstVif = {MgmtIfMac, "xenbr0"},
