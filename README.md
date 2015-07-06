@@ -51,7 +51,7 @@ lucet:wire(SrcId, DstId)
 Creates `bound_to` path between `SrcId` and `DstId` in Dobby. `SrcId`
 and `DstId` are binaries for identifiers' names. 
 
-If `ScrId` or the path doesn't exist an error is returned.
+If `SrcId` or the path doesn't exist an error is returned.
 
 A `bound_to` path can only consist of:
 
@@ -114,7 +114,7 @@ The script takes the following options:
 Options | Description | Default
 ----------|-------------|-----------
 out | The output file | "out.json"
-physical_hosts | Number of physcial hosts (ph) | 2
+physical_hosts | Number of physical hosts (ph) | 2
 physical_ports | Number of physical ports (pp) per ph | 4
 virtual hosts | Number of virtual hosts (vp) with endpoints (ep) | 1
 ofp_ports | Number of OpenFlow ports per vh with OpenFlow switch (ofs) | 4
@@ -216,12 +216,12 @@ After this call the topology will change into this:
 
 ![example1](docs/example4.png)
 
-In comparion to the previous state it has 2 new identifers, and 8 new links.
+In comparison to the previous state it has 2 new identifiers, and 8 new links.
 The identifiers are:
 
-1. Xen brdige between Virtual Ports of Virtual Host 1 and 2 on Physical
+1. Xen bridge between Virtual Ports of Virtual Host 1 and 2 on Physical
 Host 1: `PH1/inbr_vif1.2_vif2.1`
-2. Xen brdige between Virtual Ports of Virtual Host 1 and 2 on Physical
+2. Xen bridge between Virtual Ports of Virtual Host 1 and 2 on Physical
 Host 2: `PH2/inbr_vif1.2_vif2.1`.
 
 And the links:
