@@ -9,10 +9,24 @@
 -define(JSON_FILE, "../lucet_design_fig_17_A.json").
 
 -define(EP1, <<"PH1/VH2/EP1">>).
--define(OFS1_OFP2, <<"PH1/VH1/OFS1/OFP2">>).
+-define(PH1_OFS1_OFP2, <<"PH1/VH1/OFS1/OFP2">>).
 -define(EP1_TO_PH1_OFS1_OFP2,
         [?EP1, <<"PH1/VH2/VP0">>, <<"PH1/VP2.1">>, <<"PH1/PatchP">>,
-         <<"PH1/VP1.2">>, <<"PH1/VH1/VP2">>, ?OFS1_OFP2]).
+         <<"PH1/VP1.2">>, <<"PH1/VH1/VP2">>, ?PH1_OFS1_OFP2]).
+-define(PH1_PP1, <<"PH1/PP1">>).
+
+-define(MAC, "00:00:00:00:A0:01").
+
+-define(PH1_VIF_STRING(VhNo, Mac),
+        case VhNo of
+            1 ->
+                "vif=['mac=" ++ Mac ++ ",bridge=xenbr0',"
+                    "'bridge=inbr_vif1.2_vif2.1',"
+                    "'bridge=xenbr1']";
+            2 ->
+                "vif=['mac=" ++ Mac ++ ",bridge=xenbr0',"
+                    "'bridge=inbr_vif1.2_vif2.1']"
+        end).
 
 -define(PH1_OFS1_OFP1, <<"PH1/VH1/OFS1/OFP1">>).
 -define(PH2_OFS1_OFP1, <<"PH2/VH1/OFS1/OFP1">>).
@@ -56,7 +70,11 @@ ld_fig17a_test_() ->
       {"Bound path between OFPS",
        fun it_binds_path_between_ofps/0},
       {"Bound already bounded path between OFPS",
-       fun it_binds_already_bounded_path_between_ofps/0}
+       fun it_binds_already_bounded_path_between_ofps/0},
+      {"Generate domain config for OFS VH",
+       fun it_generates_vh_domain_cfg_for_ofs_vh/0},
+      {"Generate domain config for EP VH",
+       fun it_generates_vh_domain_cfg_for_ep_vh/0}
      ]}.
 
 %%%===================================================================
@@ -66,7 +84,7 @@ ld_fig17a_test_() ->
 it_finds_path_between_ep_and_ofp() ->
     %% GIVEN
     Src = ?EP1,
-    Dst = ?OFS1_OFP2,
+    Dst = ?PH1_OFS1_OFP2,
 
     % WHEN
     Path = find_path_to_be_bound(Src, Dst),
@@ -77,7 +95,7 @@ it_finds_path_between_ep_and_ofp() ->
 it_binds_path_between_ep_and_ofp() ->
     %% GIVEN
     Src = ?EP1,
-    Dst = ?OFS1_OFP2,
+    Dst = ?PH1_OFS1_OFP2,
 
     %% WHEN
     ok = lucet:wire(Src, Dst),
@@ -91,7 +109,7 @@ it_binds_path_between_ep_and_ofp() ->
 it_binds_already_bounded_path_between_ep_and_ofp() ->
     %% GIVEN
     Src = ?EP1,
-    Dst = ?OFS1_OFP2,
+    Dst = ?PH1_OFS1_OFP2,
 
     %% WHEN
     ok = lucet:wire(Src, Dst),
@@ -137,8 +155,32 @@ it_binds_already_bounded_path_between_ofps() ->
     ?assertEqual(ok, lucet:wire(Src, Dst)),
     assert_path_bounded(Src, Dst, ?PH1_OFS1_OFP1_TO_PH2_OFS1_OFP1).
 
+it_generates_vh_domain_cfg_for_ofs_vh() ->
+    %% GIVEN
+    ok = lucet:wire(?PH1_OFS1_OFP1, ?PH1_PP1),
+    ok = lucet:wire(?PH1_OFS1_OFP2, ?EP1),
+
+    %%  WHEN
+    VifString = lucet:generate_vh_domain_config(<<"PH1">>, VhNo = 1, ?MAC),
+
+    %% THEN
+    Expected = ?PH1_VIF_STRING(VhNo, ?MAC),
+    ?assertEqual(Expected, remove_newlines_and_spaces(VifString)).
+
+it_generates_vh_domain_cfg_for_ep_vh() ->
+    %% GIVEN
+    ok = lucet:wire(?PH1_OFS1_OFP1, ?PH1_PP1),
+    ok = lucet:wire(?PH1_OFS1_OFP2, ?EP1),
+
+    %%  WHEN
+    VifString = lucet:generate_vh_domain_config(<<"PH1">>, VhNo = 2, ?MAC),
+
+    %% THEN
+    Expected = ?PH1_VIF_STRING(VhNo, ?MAC),
+    ?assertEqual(Expected, remove_newlines_and_spaces(VifString)).
+
 %%%===================================================================
-%%% Assertins
+%%% Assertions
 %%%===================================================================
 
 assert_src_connected_to_dst(Src, Dst) ->
@@ -189,7 +231,7 @@ assert_xenbr_setup_between_ports({<<"lm_vp">>, PortA}, {<<"lm_vp">>, PortB}) ->
 assert_inbr_xenbr_setup(PortA, PortB) ->
     Fun = fun(Id, _, _, Acc) when Id =:= PortA ->
                   {continue, Acc};
-             (Id, _, [{InbrId, InbrMd, _} | _] = Path, Acc)
+             (Id, _, [{InbrId, InbrMd, _} | _] = Path, _)
                 when Id =:= PortB andalso length(Path) =:= 2 ->
                   {stop, {InbrId, InbrMd}};
              %% If we are not in the start identifer or in the destination
@@ -207,7 +249,7 @@ assert_inbr_xenbr_setup(PortA, PortB) ->
 assert_xenbr_connections_setup(PortA, PortB) ->
     Fun = fun(Id, _, _, Acc) when Id =:= PortA ->
                   {continue, Acc};
-             (Id, _, Path, Acc) when Id =:= PortB andalso length(Path) =:= 2 ->
+             (Id, _, Path, _) when Id =:= PortB andalso length(Path) =:= 2 ->
                   {stop, ok};
              %% If we are not in the start identifer or in the destination
              %% we can only move to the xenbr virtual port
@@ -271,13 +313,5 @@ find_identifier_type(Id) ->
           end,
     dby:search(Fun, not_found, Id, [breadth, {max_depth, 0}]).
 
-
-split_identifier_into_prefix_and_rest(Identifier) ->
-    IdentifierS = binary_to_list(Identifier),
-    case string:tokens(IdentifierS, "/") of
-        IdentifierS ->
-            "";
-        Tokens0 ->
-            Tokens1 = lists:droplast(Tokens0),
-            {string:join(Tokens1, "/"), hd(lists:reverse(Tokens0))}
-    end.
+remove_newlines_and_spaces(String) ->
+    re:replace(String, "\n| """, "", [{return, list}, global]).

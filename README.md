@@ -80,7 +80,7 @@ numbers associated with VPs that are linked.
 ## Generating domain config files for Xen
 
 ```erlang
-lucet:generate_lincx_domain_config(VirtalHost, MgmtIfMac)
+lucet:generate_vh_domain_config(PhysicalHost, VirtualHostNo, MgmtIfMac)
 ```
 
 Generates domain config file for Virtual Hosts (not necessarily those
