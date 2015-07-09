@@ -87,19 +87,19 @@ generate_lincx_domain_config(VirtualHost, MgmtIfMac) ->
 		 when VirtualHostId =:= VirtualHost ->
 		   {continue, Acc#{virtual_host_found := true}};
 	      %% A virtual port, directly connected to the virtual host.
-	      %% Let's keep those in a list.
-	      (VirtualPortId, #{<<"type">> := #{value := <<"lm_vp">>}},
+	      (_VirtualPortId, #{<<"type">> := #{value := <<"lm_vp">>}},
 	       [{VirtualHostId, #{}, #{<<"type">> := #{value := <<"part_of">>}}}],
-	       Acc = #{virtual_ports := VirtualPorts})
-		 when VirtualHostId =:= VirtualHost ->
-		   {continue, Acc#{virtual_ports := [VirtualPortId | VirtualPorts]}};
-	      %% A VIF, bound to one of our virtual ports.
-	      (_, #{<<"type">> := #{value := <<"lm_vp">>}},
-	       [{_, #{<<"type">> := #{value := <<"lm_vp">>}}, #{<<"type">> := #{value := <<"bound_to">>}}},
-		{VirtualHostId, #{}, #{<<"type">> := #{value := <<"part_of">>}}}],
 	       Acc)
 		 when VirtualHostId =:= VirtualHost ->
 		   {continue, Acc};
+	      %% A VIF, bound to one of our virtual ports.
+	      %% Let's keep those in a list.
+	      (VifId, #{<<"type">> := #{value := <<"lm_vp">>}},
+	       [{_, #{<<"type">> := #{value := <<"lm_vp">>}}, #{<<"type">> := #{value := <<"bound_to">>}}},
+		{VirtualHostId, #{}, #{<<"type">> := #{value := <<"part_of">>}}}],
+	       Acc = #{vifs := Vifs})
+		 when VirtualHostId =:= VirtualHost ->
+		   {continue, Acc#{vifs := [VifId | Vifs]}};
 	      %% A patch panel.  Keep going.
 	      (_, #{<<"type">> := #{value := <<"lm_patchp">>}}, _, Acc) ->
 		   {continue, Acc};
@@ -135,7 +135,7 @@ generate_lincx_domain_config(VirtualHost, MgmtIfMac) ->
 	   end,
 	   #{virtual_host_found => false,
 	     patch_panel_found => false,
-	     virtual_ports => []},
+	     vifs => []},
 	   VirtualHost,
 	   %% TODO: fix max_depth
 	   [breadth, {max_depth, 10}, {loop, link}]) of
@@ -150,13 +150,13 @@ generate_lincx_domain_config(VirtualHost, MgmtIfMac) ->
 
 	#{patch_panel_id := _PatchPanelId,
 	  wires := Wires,
-	  virtual_ports := VirtualPorts,
+	  vifs := Vifs,
 	  physical_host_id := _PhysicalHost} ->
 	    %% TODO: match up virtual ports to bridge interfaces.
 	    %% Probably need to extract from Dobby.
 	    FirstVif = {MgmtIfMac, <<"xenbr0">>},
 	    MgmtIfMacNo = mac_string_to_number(MgmtIfMac),
-	    OtherVifs = find_xen_bridges_for_vh_vps(VirtualPorts, Wires),
+	    OtherVifs = find_xen_bridges_for_vh_vps(Vifs, Wires),
 	    VifList = [FirstVif] ++ lists:usort(OtherVifs),
 	    VifString = "vif = [" ++
 		string:join([begin
@@ -509,7 +509,7 @@ is_port_attached_to_patchp_bounded(Wires, PortId) ->
     maps:get(PortId, Wires, <<"null">>) =/= <<"null">>.
 
 
-find_xen_bridges_for_vh_vps(VhVirtalPorts, Wires) ->
+find_xen_bridges_for_vh_vps(Vifs, Wires) ->
     lists:foldl(
       fun({Port1, Port2}, Acc) ->
               case find_vp_linked_to_ports_as_part_of(Port1, Port2) of
@@ -528,7 +528,7 @@ find_xen_bridges_for_vh_vps(VhVirtalPorts, Wires) ->
                       Acc
               end
       end, [], [{VP, maps:get(VP, Wires)}
-                || VP <- VhVirtalPorts, maps:get(VP, Wires, <<"null">>) =/= <<"null">>]).
+                || VP <- Vifs, maps:get(VP, Wires, <<"null">>) =/= <<"null">>]).
 
 find_vp_linked_to_ports_as_part_of(Port1, Port2) ->
     Fun = fun(_, _, [], _Acc) ->
