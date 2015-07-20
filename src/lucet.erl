@@ -65,7 +65,7 @@
 
 wire(SrcId, DstId) ->
     global:sync(),
-    {module, _} = dby:install(?MODULE),
+    dobby_install_module(),
     case find_path_to_bound(SrcId, DstId) of
         Path when is_list(Path) ->
             Bindings = bind_ports_on_patch_panel(Path),
@@ -79,7 +79,7 @@ generate_lincx_domain_config(VirtualHost, MgmtIfMac) when is_list(VirtualHost) -
     generate_lincx_domain_config(list_to_binary(VirtualHost), MgmtIfMac);
 generate_lincx_domain_config(VirtualHost, MgmtIfMac) ->
     global:sync(),
-    {module, _} = dby:install(?MODULE),
+    dobby_install_module(),
     %% TODO: use domain config template file
     case dby:search(
 	   %% First, ensure we can find the specified virtual host.
@@ -188,7 +188,7 @@ generate_lincx_domain_config(VirtualHost, MgmtIfMac) ->
 
 generate_vh_domain_config(PhysicalHost, VhNo, MgmtMac) ->
     global:sync(),
-    {module, _} = dby:install(?MODULE),
+    dobby_install_module(),
     Vifs = collect_vifs_identifiers_for_vh_no(binary_to_list(PhysicalHost),
                                               VhNo),
     try
@@ -579,6 +579,11 @@ find_vp_linked_to_ports_as_part_of(Port1, Port2) ->
           end,
     dby:search(Fun, not_found, Port1, [breadth, {max_depth, 3}, {loop, link}]).
 
-
-
-
+-ifdef(TEST).
+%% dby:install prevents meaningful cover reports.
+dobby_install_module() ->
+    ok.
+-else.
+dobby_install_module() ->
+    {module, _} = dby:install(?MODULE).
+-endif.
