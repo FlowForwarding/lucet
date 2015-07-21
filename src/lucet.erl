@@ -329,7 +329,7 @@ create_connected_to_link(SrcId, DstId) ->
                       LinkMetadata :: metadata_info()}.
 
 link_xenbrs([{
-               {_PatchpId, ?TYPE(<<"lm_patchp">>), _},
+               {PatchpId, ?TYPE(<<"lm_patchp">>), _},
                {P1Id, #{<<"type">> := #{value := P1Type}}, _},
                {P2Id, #{<<"type">> := #{value := P2Type}}, _}
              } | Rest]) ->
@@ -343,7 +343,10 @@ link_xenbrs([{
                                 {publish_xenbr_for_ph(P2Id),
                                  [P1Id, P2Id]};
                             _ ->
-                                {publish_inbr_for_ph(P1Id, P2Id),
+                                {PhId, _} =
+                                    split_identifier_into_prefix_and_rest(
+                                      PatchpId),
+                                {publish_inbr_for_ph(PhId, P1Id, P2Id),
                                  [P1Id, P2Id]}
                         end,
     link_xenbrs(XenbrId, LinkTo),
@@ -353,11 +356,11 @@ link_xenbrs([_Other | Rest]) ->
 link_xenbrs([]) ->
     ok.
 
-publish_inbr_for_ph(P1Id, P2Id) ->
-    {Prefix, Rest1} = split_identifier_into_prefix_and_rest(P1Id),
-    {Prefix, Rest2} = split_identifier_into_prefix_and_rest(P2Id),
+publish_inbr_for_ph(PhysicalHost, Vif1, Vif2) ->
+    {_, Rest1} = split_identifier_into_prefix_and_rest(Vif1),
+    {_, Rest2} = split_identifier_into_prefix_and_rest(Vif2),
     InbrId0 = io_lib:format("~s/inbr_~s_~s",
-                            [Prefix | lists:sort([Rest1, Rest2])]),
+                            [PhysicalHost | lists:sort([Rest1, Rest2])]),
     InbrId1 = re:replace(InbrId0, "VP", "vif", [global, {return, binary}]),
     ok = dby:publish(<<"lucet">>, {InbrId1, [{<<"type">>, <<"lm_vp">>}]},
                      [persistent]),
