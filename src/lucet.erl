@@ -337,13 +337,12 @@ link_xenbrs([{
                             {<<"lm_pp">>, <<"lm_pp">>} ->
                                 {no_xenbr_between_physical_ports, []};
                             {<<"lm_pp">>, _} ->
-                                {find_xenbr_vp_for_physical_port(P1Id),
-                                 [P2Id]};
+                                {publish_xenbr_for_ph(P1Id),
+                                 [P1Id, P2Id]};
                             {_, <<"lm_pp">>} ->
-                                {find_xenbr_vp_for_physical_port(P2Id),
-                                 [P1Id]};
+                                {publish_xenbr_for_ph(P2Id),
+                                 [P1Id, P2Id]};
                             _ ->
-                                %% PhId = find_patchp_ph(PatchpId),
                                 {publish_inbr_for_ph(P1Id, P2Id),
                                  [P1Id, P2Id]}
                         end,
@@ -364,16 +363,14 @@ publish_inbr_for_ph(P1Id, P2Id) ->
                      [persistent]),
     InbrId1.
 
-find_xenbr_vp_for_physical_port(Port) ->
-    Fun = fun(XenbrVpId, ?TYPE(<<"lm_vp">>),
-              [{_, _, ?TYPE(<<"part_of">>)}], _) ->
-                  {stop, XenbrVpId};
-             (Id, _, _, Acc) when Id =:= Port ->
-                  {continue, Acc};
-             (_, _, _, Acc) ->
-                  {skip, Acc}
-          end,
-    dby:search(Fun, not_found, Port, [breadth, {max_depth, 1}]).
+publish_xenbr_for_ph(PhysicalPort) ->
+    {Prefix, _Rest} = split_identifier_into_prefix_and_rest(PhysicalPort),
+    #{<<"interface">> := #{value := Int}} = dby:identifier(PhysicalPort),
+    {match, [PpIntfNum]} = re:run(Int, "\\d+", [{capture, all, list}]),
+    XenbrId = list_to_binary(io_lib:format("~s/xenbr~s", [Prefix, PpIntfNum])),
+    ok = dby:publish(<<"lucet">>, {XenbrId, [{<<"type">>, <<"lm_vp">>}]},
+                     [persistent]),
+    XenbrId.
 
 link_xenbrs(_, []) ->
     ok;

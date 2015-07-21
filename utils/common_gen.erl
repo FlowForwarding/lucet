@@ -6,7 +6,7 @@
 -export([setup/0, publish/1, publish/2, publish/3, export_to_json/1,
          merge_patchp_wires_md/1]).
 
--export([id_endpoint/1, id_lm_ph/1, id_lm_pp/1, id_lm_patchp/2, id_lm_vp/1,
+-export([id_endpoint/1, id_lm_ph/1, id_lm_pp/2, id_lm_patchp/2, id_lm_vp/1,
          id_lm_vh/1, id_lm_of_port/1, id_lm_of_switch/1]).
 
 -export([lk_bound_to_md/0, lk_part_of_md/0, lk_endpoint_md/0]).
@@ -48,8 +48,8 @@ id_endpoint(Name) ->
 id_lm_ph(Name) ->
     {Name, [?TYPE(lm_ph)]}.
 
-id_lm_pp(Name) ->
-    {Name, [?TYPE(lm_pp)]}.
+id_lm_pp(Name, Metadata) ->
+    {Name, [?TYPE(lm_pp) | Metadata]}.
 
 id_lm_patchp(Name, Wires) ->
     {Name, [?TYPE(lm_patchp), {<<"wires">>, Wires}]}.

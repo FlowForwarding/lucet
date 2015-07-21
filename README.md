@@ -184,12 +184,19 @@ Now, the topology representation should look like on the picture below:
 
 ![example1](docs/example2.png)
 
-In comparison to the initial picture there are 7 new links:
+In comparison to the initial picture there are 2 new identifiers:
 
-1. A `part_of` link between `PH1/xenbr1` and `PH1/VP1.1`.
-2. A `bound_to` link between `PH1/PP1` and `PH1/VP1.1`.
-3. A `connected_to` link between `PH/PP1` and `PH1/VH1/OFS1/OFP1`.
-4. 3 analogous links to 1. 2. and 3. for `PH2`.
+1. Xen bridge between `PH1/PP1` and `PH1/VP1.1` called `PH1/xenbr1`. The
+bridge number is taken from the interface metadata of `PH1/PP1`.
+2. Similar bridge between `PH2/PP1` and `PH2/VP1.1` called `PH2/xenbr1`.
+
+There are also 9 new links:
+
+1. A `part_of` link between `PH1/xenbr1` and `PH1/PP1`.
+2. A `part_of` link between `PH1/xenbr1` and `PH1/VP1.1`.
+3. A `bound_to` link between `PH1/PP1` and `PH1/VP1.1`.
+4. A `connected_to` link between `PH/PP1` and `PH1/VH1/OFS1/OFP1`.
+4. 4 analogous links to 1. 2. 3. and 4. for `PH2`.
 2. A `connected_to` link between `PH1/PP1` and `PH2/PP1`.
 
 > We cannot do it with
