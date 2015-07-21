@@ -278,15 +278,15 @@ find_path_to_bound_dby_fun(DstId) ->
     fun(_, #{<<"type">> := #{value := Type}}, _, Acc) when
               Type =:= <<"lm_ph">> orelse
               Type =:= <<"lm_vh">> orelse
-              Type =:= <<"of_Switch">> ->
+              Type =:= <<"lm_of_Switch">> ->
             {skip, Acc};
        (_, _, [], _Acc) ->
             %% The first node (path is empty).
             %% Forget {start_node_not_found, SrcId}.
             {continue, []};
-       (_, ?TYPE(<<"lm_patchp">>) = Md, [{PortId, _, _} | _], Acc) ->
+       (_, ?TYPE(<<"lm_patchp">>) = Md, [{PortId, _, _} | _] = Path, Acc) ->
             #{<<"wires">> := #{value := Wires}} = Md,
-            case is_port_attached_to_patchp_bounded(Wires, PortId) of
+            case is_port_attached_to_patchp_bounded(Wires, PortId, Path) of
                 true ->
                     %% if the port is bounded, follow 'bound_to' path
                     {skip, Acc};
@@ -500,10 +500,22 @@ generate_vif_string(MgmtIfMac, Xenbrs) ->
                     ",\n       ") ++
         "]\n".
 
-is_port_attached_to_patchp_bounded(Wires, PortId) ->
+is_port_attached_to_patchp_bounded(Wires, PortId, Path) ->
     %% A port is considered bound if it is present in the wires map
     %% and not <<"null">>.
-    maps:get(PortId, Wires, <<"null">>) =/= <<"null">>.
+    %% maps:get(PortId, Wires, <<"null">>) =/= <<"null">>.
+    %% TEMPORARY WORKAROUND AS EXECUTIVE PUBLISHER IS NOT SETTING THE WIRES
+    %% CORRECRTLY
+    lists:any(fun({Id, #{<<"type">> := #{value := <<"bound_to">>}}}) ->
+                      case lists:keyfind(Id, 1, Path) of
+                          {Id, _, _} ->
+                              false;
+                          false ->
+                              true
+                      end;
+                 (_) ->
+                      false
+              end,  dby:links(PortId)).
 
 
 find_xen_bridges_for_vh_vps(Vifs, Wires) ->
