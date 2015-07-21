@@ -26,7 +26,9 @@
 -define(LINK_TYPE(V), [{_, _, ?TYPE(V)}]).
 -define(LINK_TYPE2(V), [{_, _, ?TYPE(V)} | _]).
 
+-ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
+-endif.
 -include_lib("dobby_clib/include/dobby.hrl").
 
 
