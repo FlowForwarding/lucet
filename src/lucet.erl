@@ -264,7 +264,7 @@ find_path_to_bound(SrcId, DstId) ->
     case dby:search(find_path_to_bound_dby_fun(DstId),
 		    {start_node_not_found, SrcId},
 		    SrcId,
-		    [breadth, {max_depth, 100}]) of
+		    [breadth, {max_depth, 100}, {loop, link}]) of
 	{start_node_not_found, _} = Error ->
 	    {error, Error};
         [] ->
@@ -284,6 +284,10 @@ find_path_to_bound_dby_fun(DstId) ->
             %% The first node (path is empty).
             %% Forget {start_node_not_found, SrcId}.
             {continue, []};
+       (_, _, ?LINK_TYPE2(LinkType), Acc)
+	  when LinkType =/= <<"part_of">>, LinkType =/= <<"bound_to">> ->
+	    %% Skip all link types but "part_of" and "bound_to".
+	    {skip, Acc};
        (_, ?TYPE(<<"lm_patchp">>) = Md, [{PortId, _, _} | _] = Path, Acc) ->
             #{<<"wires">> := #{value := Wires}} = Md,
             case is_port_attached_to_patchp_bounded(Wires, PortId, Path) of
