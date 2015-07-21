@@ -45,6 +45,14 @@
                                        <<"PH1/inbr_vif1.2_vif2.1">>
                                end).
 
+-define(XENBR_ID(PhysicalPort), case PhysicalPort of
+                                    %% assuming that PP1 and PP2 are bound to
+                                    %% interfaces eth1
+                                    <<"PH1/PP1">> ->
+                                        <<"PH1/xenbr1">>;
+                                    <<"PH2/PP1">> ->
+                                        <<"PH2/xenbr1">>
+                                end).
 
 -define(TYPE(V), #{<<"type">> := #{value := V}}).
 -define(LINK_TYPE(V), [{_, _, ?TYPE(V)}]).
@@ -223,12 +231,19 @@ assert_xenbr_setup_between_ports({<<"lm_pp">>, _}, {<<"lm_pp">>, _}) ->
     ok;
 assert_xenbr_setup_between_ports({TypeA, PortA}, {TypeB, PortB}) when
       TypeA =:= <<"lm_pp">> orelse TypeB =:= <<"lm_pp">> ->
-    assert_xenbr_connections_setup(PortA, PortB);
+    {PhysicalPort, VifPort} = case TypeA of
+                                  <<"lm_pp">> ->
+                                      {PortA, PortB};
+                                  _ ->
+                                      {PortB, PortA}
+                              end,
+    assert_xenbr_setup(PhysicalPort, VifPort, ?XENBR_ID(PhysicalPort)),
+    assert_xenbr_connections_setup(PhysicalPort, VifPort);
 assert_xenbr_setup_between_ports({<<"lm_vp">>, PortA}, {<<"lm_vp">>, PortB}) ->
-    assert_inbr_xenbr_setup(PortA, PortB),
+    assert_xenbr_setup(PortA, PortB, ?INBR_ID(PortA, PortB)),
     assert_xenbr_connections_setup(PortA, PortB).
 
-assert_inbr_xenbr_setup(PortA, PortB) ->
+assert_xenbr_setup(PortA, PortB, ExpectedName) ->
     Fun = fun(Id, _, _, Acc) when Id =:= PortA ->
                   {continue, Acc};
              (Id, _, [{InbrId, InbrMd, _} | _] = Path, _)
@@ -241,8 +256,8 @@ assert_inbr_xenbr_setup(PortA, PortB) ->
              (_, _, _, Acc) ->
                   {skip, Acc}
           end,
-    ExpectedInbrId1 = ?INBR_ID(PortA, PortB),
-    ?assertMatch({ExpectedInbrId1, ?TYPE(<<"lm_vp">>)},
+    %% ExpectedInbrId1 = ?INBR_ID(PortA, PortB),
+    ?assertMatch({ExpectedName, ?TYPE(<<"lm_vp">>)},
                  dby:search(Fun, not_found, PortA,
                             [breadth, {max_depth, 2}, {loop, link}])).
 

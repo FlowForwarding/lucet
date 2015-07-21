@@ -59,8 +59,7 @@ publish_ph(PhId, Args) ->
 publish_ph_ports(PhId, Args) ->
     [begin
          PpId = publish_pp_id(PhId, N),
-         VpId = publish_xenbr_vp_id(PhId, N),
-         [publish_part_of_link(PpId, Id) || Id <- [PhId, VpId]],
+         publish_part_of_link(PpId, PhId),
          PpId
      end || N <- lists:seq(1, arg(physical_ports, Args))].
 
@@ -132,14 +131,12 @@ publish_ph_id(N) ->
 
 publish_pp_id(Prefix, N) ->
     PpId = id(Prefix, "PP~p", [N]),
-    publish_id(common_gen:id_lm_pp(PpId)).
+    Metadata = [{<<"interface">>,
+                 list_to_binary(io_lib:format("eth~p", [N]))}],
+    publish_id(common_gen:id_lm_pp(PpId, Metadata)).
 
 publish_vp_id(Prefix, N) ->
     VpId = id(Prefix, "VP~p", [N]),
-    publish_id(common_gen:id_lm_vp(VpId)).
-
-publish_xenbr_vp_id(Prefix, N) ->
-    VpId = id(Prefix, "xenbr~p", [N]),
     publish_id(common_gen:id_lm_vp(VpId)).
 
 publish_vh_id(Prefix, N) ->
