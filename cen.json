@@ -1,0 +1,22 @@
+{"cenList":
+ [{
+     "cenID" : "cen1",
+     "containerIDs" : [ "c1","c2","c13","c14"]
+  },
+  {
+      "cenID":"cen2",
+      "containerIDs":["c4","c5","c6","c7"]
+  },
+  {
+      "cenID":"cen3",
+      "containerIDs":["c15","c16","c9","c10","c11"]
+  },
+  {
+      "cenID":"cen4",
+      "containerIDs":["c11","c12"]
+  },
+  {
+      "cenID":"cen5",
+      "containerIDs":["c2","c3"]
+  }]
+}
